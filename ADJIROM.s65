@@ -1,0 +1,32 @@
+                .include "submodules/beeb/include/beeb.s65"
+
+;-------------------------------------------------------------------------
+
+*=$a8
+                .dsection zp
+                .cerror *>$b0,'zp overflow'
+
+;-------------------------------------------------------------------------
+
+*=$8000
+                .dsection code
+                .if debug
+                ; The debug ROM is for loading into sideways RAM or
+                ; similar, and can occupy the full 16 KB.
+                .cerror *>$c000,'code overflow'
+                .else
+                ; The real ADJI ROM is 4 KB.
+                .cerror *>$9000,'code overflow'
+                .endif
+                
+;-------------------------------------------------------------------------
+
+                .section zp
+                .endsection zp
+
+;-------------------------------------------------------------------------
+
+                .section code
+                .endsection code
+
+;-------------------------------------------------------------------------
