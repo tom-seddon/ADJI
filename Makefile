@@ -19,7 +19,7 @@ _V:=$(if $(VERBOSE),time ,@)
 ##########################################################################
 ##########################################################################
 
-TASS_ARGS:=--quiet --nostart --case-sensitive -Wall --verbose-list
+TASS_ARGS:=--quiet --nostart --case-sensitive -Wall --verbose-list --long-branch
 
 ##########################################################################
 ##########################################################################
@@ -34,6 +34,8 @@ build:
 
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJIROM"
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJIROM"
+	$(_V)$(SHELLCMD) blank-line
+	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM.bin"
 
 ##########################################################################
 ##########################################################################

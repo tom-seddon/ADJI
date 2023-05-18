@@ -1,4 +1,12 @@
                 .include "submodules/beeb/include/beeb.s65"
+                .edef '\\','\'
+
+;-------------------------------------------------------------------------
+
+brkbuf=$100
+
+rom_name='ADJI'
+rom_ver='0.01'
 
 ;-------------------------------------------------------------------------
 
@@ -22,11 +30,610 @@
 ;-------------------------------------------------------------------------
 
                 .section zp
+fc_table_offset:
+                .fill 1
+fc_string_offset:
+                .fill 1
+ktest_ptr:
+pfs_ptr:
+                .fill 2
                 .endsection zp
 
 ;-------------------------------------------------------------------------
 
                 .section code
+rom_header:
+                .byte 0,0,0     ;language entry (none)
+                jmp svc         ;service entry
+                .byte $82       ;ROM type: service entry, 6502 code
+                .byte <rom_copyright
+                .byte 0
+rom_title:
+                .text rom_name
+                .byte 0
+rom_version:
+                .text rom_ver
+rom_copyright:
+                .byte 0
+                .text '(C) 2023 Retro Hardware'
+rom_copyright_end:
+                .byte 0
+
+;-------------------------------------------------------------------------
+
+command_table_entry: .function name,routine
+_start:
+                .cerror (routine&$8000)==0,'routine address bit 15 must be set'
+                .text name
+                .byte >(routine-1)
+                .byte <(routine-1)
+                .endfunction _start-command_table
+                
+command_table: .block
+subjects_offset=*-command_table
+                .command_table_entry "ADJI",help_adji
+                .byte 0
+cmds_offset=*-command_table
+                .command_table_entry "JSTICK",cmd_jstick
+                .command_table_entry "KTEST",cmd_ktest
+                .byte 0
+                .endblock
+
+;-------------------------------------------------------------------------
+
+error_table_entry: .function err,text
+_start:
+                .byte err
+                .text text
+                .byte 0
+                .endfunction _start-errors_table
+
+errors_table: .block
+bad_hex_offset: .error_table_entry $73,'Bad hex'
+todo_offset: .error_table_entry $ff,'TODO'
+                .endblock
+                
+;-------------------------------------------------------------------------
+
+key_table_entry: .macro ascii,name,key_number
+                .byte \ascii
+                .text \name
+                .byte \key_number|$80
+                .endmacro
+
+keys_table:
+                ; BBC/Electron keys
+                .key_table_entry 'A','A',key_a
+                .key_table_entry 'B','B',key_b
+                .key_table_entry 'C','C',key_c
+                .key_table_entry 'D','D',key_d
+                .key_table_entry 'E','E',key_e
+                .key_table_entry 'F','F',key_f
+                .key_table_entry 'G','G',key_g
+                .key_table_entry 'H','H',key_h
+                .key_table_entry 'I','I',key_i
+                .key_table_entry 'J','J',key_j
+                .key_table_entry 'K','K',key_k
+                .key_table_entry 'L','L',key_l
+                .key_table_entry 'M','M',key_m
+                .key_table_entry 'N','N',key_n
+                .key_table_entry 'O','O',key_o
+                .key_table_entry 'P','P',key_p
+                .key_table_entry 'Q','Q',key_q
+                .key_table_entry 'R','R',key_r
+                .key_table_entry 'S','S',key_s
+                .key_table_entry 'T','T',key_t
+                .key_table_entry 'U','U',key_u
+                .key_table_entry 'V','V',key_v
+                .key_table_entry 'W','W',key_w
+                .key_table_entry 'X','X',key_x
+                .key_table_entry 'Y','Y',key_y
+                .key_table_entry 'Z','Z',key_z
+                .key_table_entry '0','0',key_0
+                .key_table_entry '1','1',key_1
+                .key_table_entry '2','2',key_2
+                .key_table_entry '3','3',key_3
+                .key_table_entry '4','4',key_4
+                .key_table_entry '5','5',key_5
+                .key_table_entry '6','6',key_6
+                .key_table_entry '7','7',key_7
+                .key_table_entry '8','8',key_8
+                .key_table_entry '9','9',key_9
+                .key_table_entry '-','-',key_minus
+                .key_table_entry ';',';',key_semicolon
+                .key_table_entry ':',':',key_colon
+                .key_table_entry ',',',',key_comma
+                .key_table_entry '.','.',key_stop
+                .key_table_entry '/','/',key_slash
+                .key_table_entry ' ',"SPACE",key_space
+                .key_table_entry $1B,"ESCAPE",key_escape
+                .key_table_entry $7F,"DELETE",key_delete
+                .key_table_entry $D,"RETURN",key_return
+                .key_table_entry $8B,"CURSOR UP",key_up
+                .key_table_entry $8A,"CURSOR DOWN",key_down
+                .key_table_entry $88,"CURSOR LEFT",key_left
+                .key_table_entry $89,"CURSOR RIGHT",key_right
+                .key_table_entry $87,"COPY",key_copy
+                .key_table_entry 1,"SHIFT",key_shift
+                .key_table_entry 2,"CTRL",key_ctrl
+                .key_table_entry 3,"CAPS LOCK",key_caps_lock
+                
+                ; BBC keys
+                .key_table_entry '@','@',key_at
+                .key_table_entry '[','[',key_left_square_bracket
+                .key_table_entry '\\','\\',key_backslash
+                .key_table_entry ']',']',key_right_square_bracket
+                .key_table_entry '^','^',key_caret
+                .key_table_entry '_','_',key_underline
+                .key_table_entry 9,"TAB",key_tab
+                .key_table_entry 4,"SHIFT LOCK",key_shift_lock
+                .key_table_entry $80,"f0",key_f0
+                .key_table_entry $81,"f1",key_f1
+                .key_table_entry $82,"f2",key_f2
+                .key_table_entry $83,"f3",key_f3
+                .key_table_entry $84,"f4",key_f4
+                .key_table_entry $85,"f5",key_f5
+                .key_table_entry $86,"f6",key_f6
+                .key_table_entry $87,"f7",key_f7
+                .key_table_entry $88,"f8",key_f8
+                .key_table_entry $89,"f9",key_f9
+                
+                ; Master 128 keys
+                .key_table_entry '0','NUM 0',$6a
+                .key_table_entry '1','NUM 1',$6b
+                .key_table_entry '2','NUM 2',$7c
+                .key_table_entry '3','NUM 3',$6c
+                .key_table_entry '4','NUM 4',$7a
+                .key_table_entry '5','NUM 5',$7b
+                .key_table_entry '6','NUM 6',$1a
+                .key_table_entry '7','NUM 7',$1b
+                .key_table_entry '8','NUM 8',$2a
+                .key_table_entry '9','NUM 9',$2b
+                .key_table_entry '+','NUM +',key_numpad_plus
+                .key_table_entry '-','NUM -',key_numpad_minus
+                .key_table_entry '/','NUM /',key_numpad_divide
+                .key_table_entry '#','NUM #',key_numpad_hash
+                .key_table_entry '*','NUM *',key_numpad_multiply
+                .key_table_entry ',','NUM ,',key_numpad_comma
+                .key_table_entry $d,'NUM RETURN',key_numpad_return
+                .key_table_entry $7f,'NUM DELETE',key_numpad_delete
+                .key_table_entry '.','NUM .',key_numpad_stop
+                .text 0
+                
+;-------------------------------------------------------------------------
+
+svc: .proc
+                pha
+                cmp #$15
+                beq unclaimed   ;fast path for 100 Hz polling
+                                ;interrupt
+                cmp #4
+                beq star
+                cmp #9
+                beq help
+                ; https://beebwiki.mdfs.net/Using_high_workspace
+                cmp #$24
+                beq count_hazel
+                cmp #$22
+                beq claim_hazel
+unclaimed:
+                pla
+done:
+                ldx $f4
+                rts
+
+claimed:
+                pla
+                lda #0
+                beq done    ;i.e., JMP
+
+count_hazel:
+                dey             ;1 page required
+                jmp unclaimed
+
+claim_hazel:
+                tya
+                cmp #$dc        ;run out of HAZEL space?
+                bcc +           ;taken if not run out
+                lda #0          ;indicate workspace unavailable
++
+                sta $df0,x
+                iny             ;claim 1 page
+                jmp unclaimed
+                
+help:
+                tya
+                pha
+                jsr is_string_empty
+                bcs no_help_subject ;taken if command line empty
+                ldx #command_table.subjects_offset
+                pla
+                pha
+                tay
+                jsr find_command ;try to find subject
+                bcc found_subject
+                ; Command line not for us - do nothing and pass on.
+pla_tay_unclaimed:
+                pla
+                tay
+                jmp unclaimed
+
+no_help_subject:
+                jsr print_help_banner
+                ldx #command_table.subjects_offset
+                
+subjects_loop:
+                lda command_table,x
+                beq subjects_done
+                jsr print_following_string
+                .text 13,10,'  ',0
+subject_name_loop:
+                lda command_table,x
+                bmi next_subject
+                jsr oswrch
+                inx
+                bne subject_name_loop
+next_subject:
+                inx
+                inx
+                bne subjects_loop
+subjects_done:
+                jsr osnewl
+                jmp pla_tay_unclaimed
+
+found_subject:
+                jsr print_help_banner
+                sec
+                jsr call_command_table_routine
+                jsr osnewl
+                jmp pla_tay_unclaimed
+
+star:
+                tya
+                pha
+                ldx #command_table.cmds_offset
+                jsr find_command
+                bcc found_command
+                jmp pla_tay_unclaimed
+                
+found_command:
+                clc
+                jsr call_command_table_routine
+                pla
+                tay
+                jmp claimed
+
+print_help_banner .proc
+                jsr osnewl
+                ldy #<rom_title
+-
+                lda rom_header,y
+                bne +
+                lda #' '
++
+                jsr oswrch
+                iny
+                cpy #rom_copyright-rom_header
+                bne -
+                rts
+                
+                .endproc
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+help_adji: .proc
+                ldx #command_table.cmds_offset
+cmds_loop:
+cmd_name_loop:
+                lda command_table,x
+                beq done
+                bmi +
+                inx
+                bne cmd_name_loop
++
+                txa
+                pha
+                sec
+                jsr call_command_table_routine
+                pla
+                tax
+                inx
+                inx
+                jmp cmd_name_loop
+done:
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_jstick: .proc
+                bcc do
+
+                ldx #0
+help: .block
+                jsr print_following_string
+                .text 13,10,"  JSTICK <no> ",0
+loop:
+                lda text,x
+                beq next_part
+                jsr oswrch
+                inx
+                bne loop
+next_part:
+                inx
+                lda text,x
+                bne help
+                rts
+
+text:
+                .text 0
+                .text "<up> <down> <left> <right> <fire>",0
+                .text "SETUP",0
+                .text "TEST",0
+                .text 0
+                
+                .endblock
+                
+do:
+                ldx #errors_table.todo_offset
+                jmp do_error
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_ktest: .proc
+                bcc do
+
+help:
+                jsr print_following_string
+                .text 13,10,'  KTEST',0
+                rts
+
+do:
+                jsr print_following_string
+                .text 'Press keys...',10,13,0
+
+ktest_loop:
+                lda #<keys_table
+                sta ktest_ptr+0
+                lda #>keys_table
+                sta ktest_ptr+1
+
+keys_loop:
+                ldy #1          ;skip ASCII
+find_name_end_loop:
+                lda (ktest_ptr),y
+                bmi found_name_end
+                iny
+                bne find_name_end_loop
+found_name_end:
+                tya
+                pha             ;save offset of key number
+
+                jsr poll_key
+                bcc next_key    ;taken if not pressed
+
+wait_for_release_loop:
+                pla             ;restore offset
+                pha             ;save offset
+                jsr poll_key
+                bcs wait_for_release_loop
+
+
+                ldy #1
+print_name_loop:
+                lda (ktest_ptr),y
+                bmi printed_name
+                jsr oswrch
+                iny
+                bne print_name_loop
+printed_name:
+                jsr osnewl
+
+next_key:
+                pla             ;restore offset of key number
+                sec             ;+1 to get to next key's struct
+                adc ktest_ptr+0
+                sta ktest_ptr+0
+                bcc +
+                inc ktest_ptr+1
++
+                ldy #0
+                lda (ktest_ptr),y
+                bne keys_loop
+
+                bit $ff
+                bpl ktest_loop
+                
+                rts
+
+poll_key:
+                tay
+                lda (ktest_ptr),y
+                eor #$7f
+                tax
+                ldy #$ff
+                lda #$81
+                jsr osbyte
+                cpx #$ff
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+do_error: .proc
+                ldy #0
+                sty brkbuf
+                dex
+                dey
+
+L935E:
+                inx
+                iny
+                lda errors_table,x
+                sta brkbuf+1,y
+                bne L935E
+                jmp brkbuf
+                .endproc
+                
+;-------------------------------------------------------------------------
+; 
+; Check if command line tail is empty.
+; Entry: ($f2),y = command line tail
+; Exit:  C=0 - something on command line
+;        C=1 - nothing on command line
+retry_is_string_empty:
+                iny
+is_string_empty:
+                lda ($f2),y     ; read next value from command line
+                cmp #13
+                beq _done       ; taken with C=1 if eol
+                cmp #' '
+                beq retry_is_string_empty ; taken with C=1 if space -
+                                          ; move to next byte and try
+                                          ; again
+                clc
+_done:
+                rts
+
+;-------------------------------------------------------------------------
+;
+; Call found command's command table routine.
+; Entry: X = offset into command table of MSB of command routine
+call_command_table_routine: .proc
+                lda command_table,x
+                pha
+                lda command_table+1,x
+                pha
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+; 
+; Try to find command in commands table
+; Entry: ($f2),y = pointer to string
+;        X = offset into command_table
+; Exit: C=0 if command found
+;       X = offset of routine address
+;           (ready for call_command_table_routine)
+find_command: .block
+                stx fc_table_offset
+                clc
+                jsr is_string_empty; Check if command line tail is empty.
+                                   ; Entry: ($f2),y = command line tail
+                                   ; Exit:  C=0 - something on command line
+                                   ;        C=1 - nothing on command line
+                sty fc_string_offset
+
+L9245:
+                ldy fc_string_offset
+                dex
+                dey
+
+L9249:
+                inx
+                iny
+                lda command_table,x
+                sec
+                beq done        ; taken if end of table reached
+                bmi L9269
+                eor ($F2),y
+                and #$5F
+                beq L9249
+                lda ($F2),y
+                cmp #'.'
+                beq L9271
+
+L925F:
+                inx
+                lda command_table,x
+                bpl L925F       ; taken if end of command name reached
+
+L9265:
+                inx
+                inx
+                bne L9245
+
+L9269:
+                lda ($F2),y
+                jsr isalpha     ; Check if char is alphabetic
+                                ; Entry: A = char of interest
+                                ; Exit:  C=0 if alpha, C=1 if not alpha
+                bcc L9265       ; taken if alpha
+                dey
+
+L9271:
+                iny
+                dex
+
+L9273:
+                inx
+                lda command_table,x
+                bpl L9273
+                clc
+
+done:
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+
+; Check if char is alphabetic
+; Entry: A = char of interest
+; Exit:  C=0 if alpha, C=1 if not alpha
+
+isalpha:        .block
+                pha             ; store char
+                and #$DF        ; convert lower case to upper case
+                cmp #'A'
+                bcc not_alpha   ; taken if not alpha
+                cmp #'Z'+1
+                bcc done        ; taken if alpha
+
+not_alpha:
+                sec
+
+done:
+                pla             ; restore char
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+;
+; Print 0-terminated string following call.
+;
+print_following_string: .proc
+loop:
+                ; inc address on stack and store in pfs_ptr
+                clc
+                pla
+                adc #1
+                sta pfs_ptr+0
+                tay
+                pla
+                adc #0
+                sta pfs_ptr+1
+                pha
+                tya
+                pha
+
+                ; fetch next byte from string
+                ldy #0
+                lda (pfs_ptr),y
+                beq done
+                jsr oswrch
+                jmp loop
+
+done:
+                rts
+                
+                .endproc                
+
+;-------------------------------------------------------------------------
+
                 .endsection code
 
 ;-------------------------------------------------------------------------

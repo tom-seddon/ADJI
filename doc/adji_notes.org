@@ -1,0 +1,93 @@
+# Abbreviations
+
+- ADJI :: Advanced Digital Joystick Interface (new cartridge)
+- SJI :: Slogger Joystick Interface (original cartridge)
+
+# Electron Expansion memory usage
+
+Note regarding the overlay routine:
+
+#+begin_quote
+The correct way for the Joystick software to emulate the Keyboard is
+to intercept the OSBYTE and OSKEY calls using the "Extended Vectors"
+residing in the upper part of Page D. Most games, however, stamp all
+over Page D and so Slogger had to find an alternative reliable means
+of interception since the Slogger Joystick interface and software is
+aimed primarily at the games player.
+
+This was achieved by a very short routine resident in a selectable
+area of memory defined by the Overlay address. If no value is typed in
+at the prompt for the address then the default address of &150 is
+used, this rarely being used by games as it is in the middle of the
+Stack !!!. Values in the range 0 to &7FF0 may be used but with
+caution.
+#+end_quote
+
+For storing key definitions, Slogger used 5 locations, corresponding
+to the ROM types entries in the table at $2a0 for the following ROM
+banks:
+
+| Bank | What                         |
+|------+------------------------------|
+|    2 | Front expansion socket       |
+|    3 | Front expansion socket       |
+|    8 | Keyboard                     |
+|    9 | Keyboard                     |
+|   10 | Lower-priority copy of BASIC |
+
+The SJI has to go in the front expansion socket, and it contains no
+ROMs, so those two bytes are known to be free.
+
+The keyboard is not a ROM, so two bytes free there as well.
+
+The lower-priority copy of BASIC is ignored (presumably the Electron
+detects duplicate ROMs, same as the Beeb?) so that's free too.
+
+$290 (~*TV~ settings - unused on Electron) is also used to store some
+info:
+
+#   7  6    5   4   3   2   1   0
+: +---+---+---+---+---+---+---+---+
+; |   | 9 |               |  NUM  +
+: +---+---+---+---+---+---+---+---+
+
+~9~ is set if 9-pin joysticks are in used, otherwise digital.
+
+~NUM~ is the joystick interface address.
+
+# ADJI memory usage - Electron
+
+Keep the overlay routine. I'm not very familiar with the Electron but
+Slogger presumably knew it well.
+
+$290 can stay as-is. Set the `9` bit.
+
+The ROM table presents a slight problem, as the ADJI will contain a
+ROM! (And while fiddling, might as well try to fix the slot
+restriction too. It'd be nice to be able to plug the ADJI into either
+socket.)
+
+One byte will be available: `?&F4 EOR 1`, the other ROM bank
+(unoccupied) corresponding to the cartridge slot the ADJI is in.
+
+For the missing byte - $2f5 and $2f6 are unused?
+
+(For development purposes, the ADJI can go in any slot, and this case
+should be detected. Might also later want to put the ADJI code into an
+updated Electron Expansion ROM, too.)
+
+# ADJI memory usage - Master 128
+
+Software trampling on page $D is much rarer.
+
+Skip the overlay, ideally, and use the extended vector table to
+re-route KEYV and BYTEV. Stuff will sometimes reset this, but what can
+you do.
+
+Claim a dynamic workspace page in HAZEL for the settings. Bit wasteful
+(only 6/256 bytes used!), but shouldn't be a problem.
+
+On entry to BYTEV or KEYV, HAZEL could be unmapped. Access it with
+interrupts disabled, and restore the old value.
+
+
