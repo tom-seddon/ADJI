@@ -34,7 +34,7 @@ fc_table_offset:
                 .fill 1
 fc_string_offset:
                 .fill 1
-ktest_ptr:
+vgk_ptr:
 pfs_ptr:
                 .fill 2
                 .endsection zp
@@ -77,6 +77,10 @@ cmds_offset=*-command_table
                 .command_table_entry "JSTICK",cmd_jstick
                 .command_table_entry "KTEST",cmd_ktest
                 .byte 0
+jstick_subcmds_offset=*-command_table
+                .command_table_entry "SETUP",cmd_jstick.setup
+                .command_table_entry "TEST",cmd_jstick.test
+                .byte 0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -90,6 +94,7 @@ _start:
 
 errors_table: .block
 bad_hex_offset: .error_table_entry $73,'Bad hex'
+incompatible_hw_offset: .error_table_entry $ff,'Electron/Master 128 only'
 todo_offset: .error_table_entry $ff,'TODO'
                 .endblock
                 
@@ -212,10 +217,10 @@ svc: .proc
                 cmp #9
                 beq help
                 ; https://beebwiki.mdfs.net/Using_high_workspace
-                cmp #$24
-                beq count_hazel
                 cmp #$22
                 beq claim_hazel
+                cmp #$24
+                beq count_hazel
 unclaimed:
                 pla
 done:
@@ -375,8 +380,11 @@ text:
                 .text 0
                 
                 .endblock
-                
+
 do:
+setup:
+test:                
+                jsr ensure_valid_hw
                 ldx #errors_table.todo_offset
                 jmp do_error
                 rts
@@ -397,15 +405,40 @@ do:
                 .text 'Press keys...',10,13,0
 
 ktest_loop:
+                jsr verbose_get_key
+
+                jsr print_following_string
+                .text ' | ',0
+
+                bit $ff
+                bpl ktest_loop
+
+                lda #15
+                ldx #0
+                jsr osbyte
+                rts
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Wait for a keypress. Print the pressed key's name.
+;
+; Exit: X = INKEY value of key pressed
+verbose_get_key: .proc
                 lda #<keys_table
-                sta ktest_ptr+0
+                sta vgk_ptr+0
                 lda #>keys_table
-                sta ktest_ptr+1
+                sta vgk_ptr+1
 
 keys_loop:
-                ldy #1          ;skip ASCII
+                ldy #0
+                lda (vgk_ptr),y ;check for terminator
+                beq verbose_get_key
+                iny             ;skip ASCII
 find_name_end_loop:
-                lda (ktest_ptr),y
+                lda (vgk_ptr),y
+                beq verbose_get_key
                 bmi found_name_end
                 iny
                 bne find_name_end_loop
@@ -414,56 +447,62 @@ found_name_end:
                 pha             ;save offset of key number
 
                 jsr poll_key
-                bcc next_key    ;taken if not pressed
 
+                pla             ;restore offset of key number
+                bcs pressed     ;taken if key was pressed
+                
+                sec             ;+1 to get to next key's struct
+                adc vgk_ptr+0
+                sta vgk_ptr+0
+                bcc keys_loop
+                inc vgk_ptr+1
++
+                jmp keys_loop
+
+pressed:
 wait_for_release_loop:
-                pla             ;restore offset
                 pha             ;save offset
                 jsr poll_key
+                tax             ;X = INKEY value
+                pla             ;restore offset
                 bcs wait_for_release_loop
-
 
                 ldy #1
 print_name_loop:
-                lda (ktest_ptr),y
+                lda (vgk_ptr),y
                 bmi printed_name
                 jsr oswrch
                 iny
                 bne print_name_loop
 printed_name:
-                jsr osnewl
-
-next_key:
-                pla             ;restore offset of key number
-                sec             ;+1 to get to next key's struct
-                adc ktest_ptr+0
-                sta ktest_ptr+0
-                bcc +
-                inc ktest_ptr+1
-+
-                ldy #0
-                lda (ktest_ptr),y
-                bne keys_loop
-
-                bit $ff
-                bpl ktest_loop
-                
                 rts
 
+; poll for key
+;
+; Entry: (vgk_ptr) = entry in table
+;        A = offset from vgk_ptr of (INKEY value)^0x7f
+; Exit: A = INKEY value
+;       C=1 if key down, C=0 if key up
 poll_key:
                 tay
-                lda (ktest_ptr),y
+                lda (vgk_ptr),y
                 eor #$7f
+                pha
                 tax
                 ldy #$ff
                 lda #$81
                 jsr osbyte
                 cpx #$ff
+                pla
                 rts
+                
                 .endproc
                 
 ;-------------------------------------------------------------------------
-
+;
+; Cause an error.
+;
+; Entry: X = offset of error data in errors_table
 do_error: .proc
                 ldy #0
                 sty brkbuf
@@ -631,6 +670,44 @@ done:
                 rts
                 
                 .endproc                
+
+;-------------------------------------------------------------------------
+;
+; Return value indicating whether hardware type is valid.
+;
+; Exit: C=1 if valid type:
+;            X=0 if Electron
+;            X=1 if Master 128
+;       C=0 if invalid type
+;-------------------------------------------------------------------------
+
+is_valid_hw: .proc
+                ; https://beebwiki.mdfs.net/OSBYTE_%2600
+                lda #0
+                ldx #1
+                jsr osbyte
+                cpx #0
+                beq electron
+                cpx #3
+                beq master
+                clc
+master:
+                ldx #1
+electron:
+done:
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
+;
+; Check valid hardware, doing a BRK if not valid.
+;
+ensure_valid_hw: .proc
+                jsr is_valid_hw
+                bcs is_valid_hw.done
+                ldx #errors_table.incompatible_hw_offset
+                jmp do_error
+                .endproc
 
 ;-------------------------------------------------------------------------
 
