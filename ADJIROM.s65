@@ -3,6 +3,11 @@
 
 ;-------------------------------------------------------------------------
 
+
+default_vectors_ptr=$ffb7
+                
+;-------------------------------------------------------------------------
+
 brkbuf=$100
 
 rom_name='ADJI'
@@ -10,9 +15,68 @@ rom_ver='0.01'
 
 ;-------------------------------------------------------------------------
 
+State: .struct
+jflags: .fill 1
+up: .fill 1
+down: .fill 1
+left: .fill 1
+right: .fill 1
+fire: .fill 1
+               .endstruct
+
+M128State: .struct
+state .dstruct State
+old_acccon: .fill 1
+old_p: .fill 1
+                .endstruct
+
+elk_jflags=$0290                ;
+elk_up=$02a8                    ;keyboard
+elk_down=$02a9                  ;keyboard
+elk_left=$02aa                  ;lower-priority BASIC
+elk_right=$02f5                 ;unused by Electron OS
+elk_fire=$02f6                  ;unused by Electron OS
+
+;-------------------------------------------------------------------------
+
+struct_section: .macro
+                .struct
+                .dsection \1
+                .ends
+                .endmacro
+
 *=$a8
-                .dsection zp
+                ; Leaf routines that only use transient zp workspace
+                .union
+                .struct_section verbose_get_key_workspace
+                .struct_section print_joystick_action_name_workspace
+                .endunion
+
+                ; Leaf routines that return a result in zero page
+                .union
+                .struct_section strtoi_workspace
+                .endunion
+
+                ; * commands
+                .union
+                .struct_section cmd_jtest_workspace
+                .endunion
+                
                 .cerror *>$b0,'zp overflow'
+
+;-------------------------------------------------------------------------
+
+*=$b0
+                ; Leaf routines that only use transient zp workspace
+                ; and make no FS calls (or can survive their workspace
+                ; being zapped if one is made)
+                .union
+                .struct_section print_following_string_workspace
+                .struct_section find_command_workspace
+                .struct_section reset_default_vectors_workspace
+                .struct_section read_or_write_state_workspace
+                .endunion
+                .cerror *>$c0,'FS scratch zp overflow'
 
 ;-------------------------------------------------------------------------
 
@@ -27,18 +91,6 @@ rom_ver='0.01'
                 .cerror *>$9000,'code overflow'
                 .endif
                 
-;-------------------------------------------------------------------------
-
-                .section zp
-fc_table_offset:
-                .fill 1
-fc_string_offset:
-                .fill 1
-vgk_ptr:
-pfs_ptr:
-                .fill 2
-                .endsection zp
-
 ;-------------------------------------------------------------------------
 
                 .section code
@@ -61,26 +113,36 @@ rom_copyright_end:
 
 ;-------------------------------------------------------------------------
 
-command_table_entry: .function name,routine
+command_table_entry: .function name,routine,help_offset
 _start:
                 .cerror (routine&$8000)==0,'routine address bit 15 must be set'
                 .text name
                 .byte >(routine-1)
                 .byte <(routine-1)
+                .byte help_offset
                 .endfunction _start-command_table
                 
 command_table: .block
 subjects_offset=*-command_table
-                .command_table_entry "ADJI",help_adji
+                .command_table_entry "ADJI",help_adji,help_table.none_offset
                 .byte 0
 cmds_offset=*-command_table
-                .command_table_entry "JSTICK",cmd_jstick
-                .command_table_entry "KTEST",cmd_ktest
+                .command_table_entry "JON",cmd_jon,help_table.jon_offset
+                .command_table_entry "JOFF",cmd_joff,help_table.none_offset
+                .command_table_entry "JKEYS",cmd_jkeys,help_table.jkeys_offset
+                .command_table_entry "JTEST",cmd_jtest,help_table.jtest_offset
+                .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
                 .byte 0
-jstick_subcmds_offset=*-command_table
-                .command_table_entry "SETUP",cmd_jstick.setup
-                .command_table_entry "TEST",cmd_jstick.test
-                .byte 0
+                .endblock
+
+help_table: .block
+jon_offset=*-help_table
+jtest_offset=*-help_table
+                .text ' <no>'
+none_offset=*-help_table
+                .text 0
+jkeys_offset=*-help_table
+                .text ' <no> (<up> <down> <left> <right> <fire>)',0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -93,8 +155,11 @@ _start:
                 .endfunction _start-errors_table
 
 errors_table: .block
-bad_hex_offset: .error_table_entry $73,'Bad hex'
+bad_hex_offset: .error_table_entry $fe,'Bad hex'
 incompatible_hw_offset: .error_table_entry $ff,'Electron/Master 128 only'
+key_missing_offset: .error_table_entry $dc,'Key missing'
+bad_jno_offset: .error_table_entry $dc,'Bad joystick'
+no_free_hazel: .error_table_entry $ff,'No free FS RAM'
 todo_offset: .error_table_entry $ff,'TODO'
                 .endblock
                 
@@ -249,7 +314,7 @@ claim_hazel:
 help:
                 tya
                 pha
-                jsr is_string_empty
+                jsr find_string_tail
                 bcs no_help_subject ;taken if command line empty
                 ldx #command_table.subjects_offset
                 pla
@@ -266,31 +331,13 @@ pla_tay_unclaimed:
 no_help_subject:
                 jsr print_help_banner
                 ldx #command_table.subjects_offset
-                
-subjects_loop:
-                lda command_table,x
-                beq subjects_done
-                jsr print_following_string
-                .text 13,10,'  ',0
-subject_name_loop:
-                lda command_table,x
-                bmi next_subject
-                jsr oswrch
-                inx
-                bne subject_name_loop
-next_subject:
-                inx
-                inx
-                bne subjects_loop
-subjects_done:
-                jsr osnewl
+                jsr print_help
                 jmp pla_tay_unclaimed
 
 found_subject:
                 jsr print_help_banner
                 sec
                 jsr call_command_table_routine
-                jsr osnewl
                 jmp pla_tay_unclaimed
 
 star:
@@ -330,77 +377,230 @@ print_help_banner .proc
 
 help_adji: .proc
                 ldx #command_table.cmds_offset
+                jmp print_help
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Print help for part of the commands table.
+;
+; Entry: X = offset of first command
+;
+print_help: .proc
+                jsr osnewl
 cmds_loop:
-cmd_name_loop:
                 lda command_table,x
                 beq done
-                bmi +
+                lda #' '
+                jsr oswrch
+                jsr oswrch
+cmd_name_loop:
+                lda command_table,x
+                bmi name_done
+                jsr oswrch
                 inx
                 bne cmd_name_loop
-+
-                txa
-                pha
-                sec
-                jsr call_command_table_routine
-                pla
-                tax
+name_done:
                 inx
                 inx
-                jmp cmd_name_loop
+                ldy command_table,x
+                inx
+help_loop:
+                lda help_table,y
+                beq next
+                jsr oswrch
+                iny
+                bne help_loop
+next:
+                jsr osnewl
+                jmp cmds_loop
 done:
                 rts
                 .endproc
 
 ;-------------------------------------------------------------------------
 
-cmd_jstick: .proc
-                bcc do
-
-                ldx #0
-help: .block
-                jsr print_following_string
-                .text 13,10,"  JSTICK <no> ",0
-loop:
-                lda text,x
-                beq next_part
-                jsr oswrch
-                inx
-                bne loop
-next_part:
-                inx
-                lda text,x
-                bne help
-                rts
-
-text:
-                .text 0
-                .text "<up> <down> <left> <right> <fire>",0
-                .text "SETUP",0
-                .text "TEST",0
-                .text 0
-                
-                .endblock
-
-do:
-setup:
-test:                
-                jsr ensure_valid_hw
+cmd_jon:
+cmd_joff:
+cmd_jkeys:
                 ldx #errors_table.todo_offset
                 jmp do_error
+
+;-------------------------------------------------------------------------
+
+cmd_jtest: .proc
+                .section cmd_jtest_workspace
+joystick_index: .fill 1
+action_index: .fill 1
+                .endsection
+                
+                jsr parse_jno
+                sta joystick_index
+                
+                jsr print_following_string
+                .text 22,135
+                .text 31,8,5
+                .text "J O Y S T I C K   T E S T"
+                .byte 0
+
+                jsr coff
+
+loop:
+                bit $ff
+                bmi done        ;taken if Escape pressed
+
+                lda #4
+                sta action_index
+check_actions:
+                jsr print_following_string
+                .byte 31,17,0
+                
+                lda action_index
+                clc
+                adc #10         
+                jsr oswrch      ;PRINT TAB(17,Y)
+
+                ldx joystick_index
+                jsr read_joystick
+                
+                ldx action_index
+                and joystick_actions.masks,x
+                bne +
+                ldx #$ff        ;no action
++
+                jsr print_joystick_action_name
+
+                dec action_index
+                bpl check_actions
+                jmp loop
+
+done:
+                jsr con
+                lda #$7e
+                jsr osbyte
+                lda #12
+                jmp oswrch
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Print joystick action name, padded on the right with spaces.
+;
+; Entry: X = joystick action index, or $FF for no blanks
+print_joystick_action_name: .proc
+                .section print_joystick_action_name_workspace
+pja_index: .fill 1
+                .endsection
+
+                inx
+                stx pja_index
+                txa
+                asl a           ;*2, C=0
+                asl a           ;*4, C=0
+                adc pja_index   ;*5
+                tay
+print:
+                ldx #4
+-
+                lda joystick_actions.names,y
+                jsr oswrch
+                iny
+                dex
+                bpl -
                 rts
                 .endproc
 
 ;-------------------------------------------------------------------------
 
+joystick_actions: .block
+masks:
+                .byte 1,2,4,8,16
+names:
+                ;      01234
+                .text "     "
+                .text "UP   "
+                .text "DOWN "
+                .text "LEFT "
+                .text "RIGHT"
+                .text "FIRE "
+                .endblock
+
+; cmd_jstick: .proc
+;                 bcc do
+
+;                 ldx #0
+; help: .block
+;                 jsr print_following_string
+;                 .text 13,10,"  JSTICK <no> ",0
+; loop:
+;                 lda text,x
+;                 beq next_part
+;                 jsr oswrch
+;                 inx
+;                 bne loop
+; next_part:
+;                 inx
+;                 lda text,x
+;                 bne help
+;                 rts
+
+; text:
+;                 .text 0
+;                 .text "<up> <down> <left> <right> <fire>",0
+;                 .text "SETUP",0
+;                 .text "TEST",0
+;                 .text 0
+                
+;                 .endblock
+
+; do:
+;                 jsr must_be_valid_hw
+;                 jsr reset_default_vectors
+;                 lda #$77
+;                 jsr osbyte      ;close *SPOOL/*EXEC handles
+;                 jsr find_string_tail
+;                 bcc +
+; key_missing_error:
+;                 ldx #errors_table.key_missing_offset
+;                 jmp do_error
+; +
+;                 jsr strtoi
+;                 tax
+;                 dex
+;                 cpx #4
+;                 bcs key_missing_error ;???
+;                 stx strtoi_value
+
+;                 tya
+;                 pha             ;save string offset
+                
+;                 ldy #State.jflags
+;                 jsr read_state
+;                 and #$fc
+;                 ora strtoi_value
+;                 ora #$40
+;                 jsr write_state
+
+;                 pla             ;restore string offset
+;                 pha             ;save string offset
+;                 tay             ;Y=string offset
+
+;                 ldx #commands_table.jstick_subcmds_offset
+;                 jsr find_command
+
+                
+                
+; setup:
+; test:                
+;                 ldx #errors_table.todo_offset
+;                 jmp do_error
+;                 rts
+;                 .endproc
+
+;-------------------------------------------------------------------------
+
 cmd_ktest: .proc
-                bcc do
-
-help:
-                jsr print_following_string
-                .text 13,10,'  KTEST',0
-                rts
-
-do:
                 jsr print_following_string
                 .text 'Press keys...',10,13,0
 
@@ -422,10 +622,60 @@ ktest_loop:
 
 ;-------------------------------------------------------------------------
 ;
+; Switch cursor on (con) or off (coff)
+; 
+con:
+                ldx #con_vdu-cset_vdu
+                jmp cset
+coff:
+                ldx #coff_vdu-cset_vdu
+cset:
+                ldy #10
+cset_loop:
+                lda cset_vdu,x
+                jsr oswrch
+                inx
+                dey
+                bne cset_loop
+                rts
+                
+cset_vdu:
+con_vdu:
+                .byte 23,1,1
+coff_vdu:
+                .byte 23,1,0
+                ; doens't matter what comes next...
+                
+;-------------------------------------------------------------------------
+;
+; Parse <no> argument from command line. Does a BRK for invalid
+; joystick numbers.
+;
+; Entry: ($f2),y = command line pointer
+; Exit: ($f2),y = updated command line pointer
+;       A = joystick index, 0-3
+parse_jno: .proc
+                jsr strtoi
+                sec
+                sbc #1
+                cmp #4
+                bcc +
+                ldx #errors_table.bad_jno_offset
+                jmp do_error
++
+                rts
+                .endproc
+;
+;-------------------------------------------------------------------------
+;
 ; Wait for a keypress. Print the pressed key's name.
 ;
 ; Exit: X = INKEY value of key pressed
 verbose_get_key: .proc
+                .section verbose_get_key_workspace
+vgk_ptr: .fill 2
+                .endsection
+                
                 lda #<keys_table
                 sta vgk_ptr+0
                 lda #>keys_table
@@ -519,19 +769,20 @@ L935E:
                 .endproc
                 
 ;-------------------------------------------------------------------------
-; 
-; Check if command line tail is empty.
-; Entry: ($f2),y = command line tail
-; Exit:  C=0 - something on command line
-;        C=1 - nothing on command line
-retry_is_string_empty:
+;
+; Find string tail.
+; Entry: ($f2),y = string pointer
+; Exit: C=0 - something on command line, ($f2),y points to it
+;       C=1 - nothing on command line, ($f2),y points to end
+; Preserves: X
+retry_find_string_tail:
                 iny
-is_string_empty:
+find_string_tail:
                 lda ($f2),y     ; read next value from command line
                 cmp #13
                 beq _done       ; taken with C=1 if eol
                 cmp #' '
-                beq retry_is_string_empty ; taken with C=1 if space -
+                beq retry_find_string_tail ; taken with C=1 if space -
                                           ; move to next byte and try
                                           ; again
                 clc
@@ -559,9 +810,14 @@ call_command_table_routine: .proc
 ;       X = offset of routine address
 ;           (ready for call_command_table_routine)
 find_command: .block
+                .section find_command_workspace
+fc_table_offset: .fill 1
+fc_string_offset: .fill 1
+                .endsection
+                
                 stx fc_table_offset
                 clc
-                jsr is_string_empty; Check if command line tail is empty.
+                jsr find_string_tail; Check if command line tail is empty.
                                    ; Entry: ($f2),y = command line tail
                                    ; Exit:  C=0 - something on command line
                                    ;        C=1 - nothing on command line
@@ -592,6 +848,7 @@ L925F:
                 bpl L925F       ; taken if end of command name reached
 
 L9265:
+                inx
                 inx
                 inx
                 bne L9245
@@ -644,7 +901,12 @@ done:
 ;
 ; Print 0-terminated string following call.
 ;
+; Preserves: X
 print_following_string: .proc
+                .section print_following_string_workspace
+pfs_ptr: .fill 2
+                .endsection
+
 loop:
                 ; inc address on stack and store in pfs_ptr
                 clc
@@ -676,12 +938,18 @@ done:
 ; Return value indicating whether hardware type is valid.
 ;
 ; Exit: C=1 if valid type:
-;            X=0 if Electron
-;            X=1 if Master 128
+;            V=0 if Electron
+;            V=1 if Master
 ;       C=0 if invalid type
+; Preserves: A/X/Y
 ;-------------------------------------------------------------------------
 
 is_valid_hw: .proc
+                pha
+                txa
+                pha
+                tya
+                pha
                 ; https://beebwiki.mdfs.net/OSBYTE_%2600
                 lda #0
                 ldx #1
@@ -690,11 +958,21 @@ is_valid_hw: .proc
                 beq electron
                 cpx #3
                 beq master
+                ; Not valid
                 clc
-master:
-                ldx #1
+                jmp done
+
 electron:
+                clv
+                bvc done        ;i.e., JMP
+master:
+                bit $8003       ;set V - there's a $4c there
 done:
+                pla
+                tay
+                pla
+                tax
+                pla
                 rts
                 .endproc
                 
@@ -702,13 +980,365 @@ done:
 ;
 ; Check valid hardware, doing a BRK if not valid.
 ;
-ensure_valid_hw: .proc
+; Exit: C=1 - same as is_valid_hw
+;       Will do a BRK if any other values
+;
+must_be_valid_hw: .proc
                 jsr is_valid_hw
-                bcs is_valid_hw.done
+                bcc error
+                rts
+error:
                 ldx #errors_table.incompatible_hw_offset
                 jmp do_error
+                
                 .endproc
 
+;-------------------------------------------------------------------------
+
+                .section read_or_write_state_workspace
+state_ptr: .fill 2
+                .endsection
+                
+;-------------------------------------------------------------------------
+;
+; Read 1 byte from the ROM state.
+;
+; Entry: Y = offset
+; Exit: A = value read
+; Preserves: X/Y
+read_state: .proc
+                jsr must_be_valid_hw
+                bvs master
+
+                stx state_ptr+0
+                ldx elk_state_offsets,y
+                lda $200,x
+                ldx state_ptr+0
+                rts
+
+master:
+                .cpu '65c02'
+                phx
+                ldx $f4
+                lda $df0,x
+                sta state_ptr+1
+                stz state_ptr+0
+                plx
+                lda (state_ptr),y
+                .cpu 'default'
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Write 1 byte to the ROM state.
+;
+; Entry: A = value to write
+;        Y = offset
+; Preserves: A/X/Y
+write_state: .proc
+                jsr must_be_valid_hw
+                bvs master
+
+                stx state_ptr+0
+                ldx elk_state_offsets,y
+                sta $200,x
+                ldx state_ptr+0
+                rts
+
+master:
+                .cpu '65c02'
+                pha
+                phx
+                ldx $f4
+                lda $df0,x
+                sta state_ptr+1
+                stz state_ptr+0
+                plx
+                pla
+                sta (state_ptr),y
+                rts
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+
+elk_state_offsets: .proc
+                .byte <elk_jflags
+                .byte <elk_up
+                .byte <elk_down
+                .byte <elk_left
+                .byte <elk_right
+                .byte <elk_fire
+                .endproc
+                
+;-------------------------------------------------------------------------
+;
+; Read 8-bit integer from string.
+;
+; Entry: ($f2),y = pointer to string
+; Exit: A = LSB of value read
+;       ($f2),y = pointer to remainder of string
+; Preserves: X
+strtoi:         .proc
+                .section strtoi_workspace
+strtoi_value: .fill 2
+                .endsection
+                
+                jsr find_string_tail
+                beq bad_hex
+                lda #0
+                sta strtoi_value+0
+                sta strtoi_value+1
+                jsr gsread      ; EAUG p12
+                bcs bad_hex     ; taken if eol
+                cmp #'&'
+                bne decimal
+; hex value
+                jsr gsread
+                bcs bad_hex     ; taken if eol
+                bcc got_digit   ; JMP, in effect
+
+hex_loop:
+                jsr gsread
+                bcs done        ; taken if eol
+
+got_digit:
+                jsr xtoi_1_digit; Convert 1 hex digit to a value
+                                ; Entry: A = ASCII digit
+                                ; Exit:  A = value
+                                ;        C=1 if digit was invalid
+                bcs bad_hex     ; taken if input error
+; strtoi_value<<=4
+                asl strtoi_value+0
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+                asl strtoi_value+0
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+                asl strtoi_value+0
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+                asl strtoi_value+0
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+; strtoi_value|=digit
+                adc strtoi_value+0
+                sta strtoi_value+0
+                bcc hex_loop    ; always a JMP???
+
+done:
+                lda strtoi_value+0
+                rts
+
+;-------------------------------------------------------------------------
+
+bad_hex:
+                ldx #errors_table.bad_hex_offset
+                jmp do_error
+
+;-------------------------------------------------------------------------
+
+decimal:
+                cmp #'-'
+                php             ; save negative flag - Z=1 if negative
+                bne decimal_loop
+                jsr gsread
+                bcs bad_hex
+
+decimal_loop:
+                jsr atoi_1_digit; Convert 1 decimal digit to a value
+                                ; Entry: A = ASCII digit
+                                ; Exit:  A = value
+                                ;        C=1 if digit was invalid
+                bcs bad_hex
+                pha             ; save digit value
+                lda strtoi_value+1
+                pha             ; save value MSB
+                lda strtoi_value
+; strtoi_value=strtoi_value*2
+                asl a
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+                asl a
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+; strtoi_value=strtoi_value*2+strtoi_value -> strtoi_value*5
+                adc strtoi_value+0
+                sta strtoi_value+0
+                pla             ; restore value MSB
+                adc strtoi_value+1
+                sta strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+; strtoi_value=(strtoi_value*2+strtoi_value)*2 -> strtoi_value*5*2 -> strtoi_value*10
+                asl strtoi_value
+                rol strtoi_value+1
+                bcs bad_hex     ; taken if overflow
+; add in digit
+                pla             ; restore digit value
+                adc strtoi_value+0
+                sta strtoi_value+0
+                bcc L953D
+                inc strtoi_value+1
+                beq bad_hex     ; taken if overflow
+
+L953D:
+                jsr gsread
+                bcc decimal_loop; taken if not eol
+                plp             ; restore negative flag
+                bne L9552    ; taken if positive
+; strtoi_value=-strtoi_value
+                sec
+                lda #0
+                sbc strtoi_value+0
+                sta strtoi_value+0
+                lda #0
+                sbc strtoi_value+1
+                sta strtoi_value+1
+
+L9552:
+                lda strtoi_value+0
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+
+; Convert 1 decimal digit to a value
+; Entry: A = ASCII digit
+; Exit:  A = value
+;        C=1 if digit was invalid
+; Preserves: X/Y
+atoi_1_digit:   .block
+                jsr xtoi_1_digit; Convert 1 hex digit to a value
+                                ; Entry: A = ASCII digit
+                                ; Exit:  A = value
+                                ;        C=1 if digit was invalid
+                bcs L955C
+                cmp #$A
+
+L955C:
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+
+; Convert 1 hex digit to a value
+; Entry: A = ASCII digit
+; Exit:  A = value
+;        C=1 if digit was invalid
+; Preserves: X/Y
+xtoi_1_digit:   .block
+                cmp #'A'
+                bcc L9563
+                sbc #7
+
+L9563:
+                sec
+                sbc #'0'
+                cmp #$10
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+;
+; Restore default BYTEV and KEYV vectors.
+;
+; Preserves: P/A/X/Y
+
+reset_default_vectors: .proc
+                .section reset_default_vectors_workspace
+rdv_ptr: .fill 2
+                .endsection
+                
+                php
+                sei
+                tya
+                pha
+
+                lda default_vectors_ptr+0
+                sta rdv_ptr+0
+                lda default_vectors_ptr+1
+                sta rdv_ptr+1
+
+                ldy #<bytev
+                jsr restore_default_vector
+
+                ldy #<keyv
+                jsr restore_default_vector
+
+                pla
+                tay
+                plp
+                rts
+
+restore_default_vector:
+                jsr restore_default_vector_byte
+restore_default_vector_byte:
+                lda (rdv_ptr),y
+                sta $200,y
+                iny
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick: .proc
+                jsr is_valid_hw
+                lda #0
+                bcc done
+                bvc read_joystick_elk
+                bvs read_joystick_master
+done:
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick on Master.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick_master: .proc
+                .cpu '65c02'
+                php
+                sei
+                lda acccon
+                pha
+                lda #acccon.ifj
+                tsb acccon
+                lda joystick_fred_offsets,x
+                tax
+                stx $70
+                lda $fc00,x
+                plx
+                stx acccon
+                plp
+                rts
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick on Electron.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick_elk:
+                lda joystick_fred_offsets,x
+                tax
+                lda $fc00,x
+                rts
+
+joystick_fred_offsets:
+                .byte $c0,$d0,$e0,$f0
+                
 ;-------------------------------------------------------------------------
 
                 .endsection code
