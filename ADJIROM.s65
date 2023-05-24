@@ -8,6 +8,23 @@ default_vectors_ptr=$ffb7
 os_a=$ef ; A value for osbyte/osword
 os_x=$f0 ; X value for osbyte/osword
 os_y=$f1 ; Y value for osbyte/osword
+
+; seems to be relatively safe to use for brief periods with IRQs
+; disabled
+os_seiwk=$fa
+
+; Routines that do PLA:<<restore ROM>>:PLA:PLP:RTS - as is part of the
+; extended vector handling mechanism.
+os_restore_rom_master=$ffa4
+os_restore_rom_electron=$ff9c
+
+;-------------------------------------------------------------------------
+;
+; See https://beebwiki.mdfs.net/OSBYTEs
+
+; Placeholder OSBYTE used to indicate that the ROM is actually being
+; entered due to KEYV.
+keyv_osbyte=83
                 
 ;-------------------------------------------------------------------------
 
@@ -16,6 +33,8 @@ brkbuf=$100
 rom_name='ADJI'
 rom_ver='0.01'
 
+default_overlay_address=$150
+                
 ;-------------------------------------------------------------------------
 
 State: .struct
@@ -27,6 +46,9 @@ right: .fill 1
 fire: .fill 1
                .endstruct
 
+; OSBYTE 209 (&D1) is reserved for the speech system [MasRef D.2-67]
+master_spare=$0261
+                
 elk_jflags=$0290                ;
 elk_up=$02a8                    ;keyboard
 elk_down=$02a9                  ;keyboard
@@ -171,6 +193,7 @@ bad_jno_offset: .error_table_entry $dc,'Bad joystick'
 no_free_hazel: .error_table_entry $ff,'No free FS RAM'
 bad_mode: .error_table_entry $ff,'Bad mode'
 todo_offset: .error_table_entry $ff,'TODO'
+electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
                 .endblock
                 
 ;-------------------------------------------------------------------------
@@ -477,10 +500,10 @@ install_xvector:
                 stx xvectors+0
                 sty xvectors+1
 
-                ldx #0          ;assume Electron
                 jsr must_be_valid_hw
-                bvc +
-                ldx #2          ;Master 128
+                bvs +           ;taken if Master 128
+                ldx #errors_table.electron_todo_offset
+                jmp do_error
 +
 
                 php
@@ -489,10 +512,10 @@ install_xvector:
                 sta bytev+1
                 ldy #(<bytev)/2*3
                 sty bytev+0
-                lda handle_osbyte_routines+0,x
+                lda #<handle_osbyte_xvector_master
                 sta (xvectors),y
                 iny
-                lda handle_osbyte_routines+1,x
+                lda #>handle_osbyte_xvector_master
                 sta (xvectors),y
                 iny
                 lda $f4
@@ -500,9 +523,9 @@ install_xvector:
                 plp
                 rts
 
-handle_osbyte_routines:
-                .word handle_osbyte_electron
-                .word handle_osbyte_master
+; handle_osbyte_routines:
+;                 .word handle_osbyte_electron
+;                 .word handle_osbyte_master
                 
 install_overlay:
                 ldx #errors_table.todo_offset
@@ -512,115 +535,221 @@ install_overlay:
 
 ;-------------------------------------------------------------------------
 ;
+; Handle OSBYTE on Master 128 when called via extended vector.
+;
+; Entry: A/X/Y = as per OSBYTE
 ; 
-handle_osbyte_routine: .macro machine_type
-                sta os_a
-                cmp #$80
-                beq handle_osbyte_80
-                jmp jmp_default_osbyte
-
-handle_osbyte_80:
-                cpx #3
-                bcs jmp_default_osbyte
-
-                .if \machine_type==machine_type_master
+handle_osbyte_xvector_master: .proc
                 .cpu '65c02'
+                cmp #$80
+                bne default     ;taken if certainly not ADVAL
+                cpx #5
+                bcs default     ;taken if non-ADVAL OSBYTE $80
+                
+                sta os_a
+                stx os_x
+                sty os_y
                 php
                 sei
+                ldx $f4
+                lda $df0,x
+                sta os_seiwk+1
+                stz os_seiwk+0
+                jmp handle_osbyte_master
+
+default:
+                jmp jmp_default_osbyte
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE/KEYV overlay routine for Master 128.
+;
+; Entry: A/X/Y/P as per OSBYTE or KEYV (according to entry point)
+;
+overlay_master: .block
+                .cpu '65c02'
+keyv_entry_offset=*-overlay_master
+                lda #keyv_osbyte
+osbyte_entry_offset=*-overlay_master
+                php
+                sei
+                pha             ;save input A
+rom_offset=*+1-overlay_master
+                lda #$ff
+                sta $fe30
+workspace_page=*+1-overlay_master
+                lda #$ff
+                jmp handle_osbyte_overlay_master
+                .endblock
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE/KEYV overlay routine suffix for Master 128
+;
+; Entry: A = workspace address MSB
+;        X/Y = as per OSBYTE
+;        Stack = [A, P, OSBYTE ret]
+; 
+handle_osbyte_overlay_master:
+                ; Store workspace address in SEIWK.
+                sta os_seiwk+1
+                stz os_seiwk+0
+
+                ; Store input registers in zero page.
+                pla             ;restore input A
+                sta os_a
+                stx os_x
+                sty os_y
+
+                plx             ;restore input P
+
+                ; Save ROMSEL
+                lda $f4
+                pha
+                
+                ; Make ROMSEL and $f4 consistent
+                lda $fe30
+                sta $f4
+
+                ; Insert overlay exit routine addres
+                lda #>handle_overlay_exit_master-1
+                pha
+                lda #<handle_overlay_exit_master-1
+                pha
+
+                phx             ;Save input P
+
+                jmp handle_osbyte_master
+
+; Entry: A/X/Y/P as per OSBYTE return
+; Stack: [old ROMSEL, return address]
+handle_overlay_exit_master:
+                .cpu '65c02'
+                pha
+                php
+                phx
+                tsx
+                ; S = X P A ROMSEL RetL RetH
+                lda $104,x      ;ROMSEL
+                pha             ;S = ROMSEL | X P A ROMSEL RetL RetH
+                lda $102,x      ;P
+                sta $104,x      ;S = ROMSEL | X P A P RetL RetH
+                pla             ;S = | X P A P RetL RetH
+                sta $102,x      ;S = | X ROMSEL A P RetL RetH
+                plx             ;S = ROMSEL A P RetL RetH
+                jmp os_restore_rom_master
+                .cpu 'default'
+                
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE/KEYV handler for Master 128
+; 
+; Entry: ?os_a, ?os_x, ?os_y = OSBYTE/KEYV entry arguments
+;        (os_seiwk) = pointer to workspace in HAZEL
+;        IRQs disabled
+;        Stack: [Input P; appropriate return address]
+
+handle_osbyte_master:
+                lda os_a
+
+                cmp #$80
+                beq osbyte_80_master
+                
+                ; ...?
+osbyte_unhandled:
+                ldx os_x
+                ldy os_y
+                plp
+                jmp jmp_default_osbyte
+
+osbyte_80_master:
+                ; Bail if not ADVAL.
+                ldx os_x
+                cpx #5
+                bcs osbyte_unhandled
+                
+                .cpu '65c02'
+                ; Save old ACCCON. Page in HAZEL. Direct FRED to
+                ; cartridge.
                 lda acccon
                 pha
                 lda #acccon.ifj|acccon.y
                 tsb acccon
-                ldy $f4
-                lda $df0,y
-                sta os_y
-                stz os_x
+
+                ; Fetch joystick index.
                 ldy #State.jflags
-                lda (os_x),y
+                lda (os_seiwk),y
                 and #3
+
+                ; ?os_a = joystick value
                 tay
                 lda joystick_fred_offsets,y
                 tay
                 lda $fc00,y
-                sta os_a        ;joystick value
+                sta os_a
+
+                ; Restore old ACCCON.
                 pla
                 sta acccon
+
+                ; OK to possibly re-enable IRQs now.
                 plp
+                
+                jmp osbyte_80_generic
                 .cpu 'default'
-                .elsif \machine_type==machine_type_electron
-                lda elk_jflags
-                and #3
-                tay
-                lda joystick_fred_offsets,y
-                tay
-                lda $fc00,y
-                sta os_a        ;joystick value
-                .else
-                .cerror 'unknown machine type'
-                .endif
-                
-                cpx #1
-                beq osbyte_80_adval1
-                cpx #2
-                beq osbyte_80_adval2
-                jmp osbyte_80_adval0
-                
-                .endmacro
                 
 ;-------------------------------------------------------------------------
 ;
-; Handle OSBYTEs
+; Handle OSBYTE $80, X=0, Y<=4
 ;
-handle_osbyte_master:
-                .handle_osbyte_routine machine_type_master
+; Entry: ?os_a = value read from joystick
+;        
+osbyte_80_generic: .proc
+                cpx #0
+                beq test_fire
 
-handle_osbyte_electron:
-                .handle_osbyte_routine machine_type_electron
-
-osbyte_80_adval0: .proc
-                ldx #0
                 lda os_a
-                and #jfire_mask
-                beq got_fire
-                inx
-got_fire:
-                ldy #4          ;does this value matter?
-                rts
-                .endproc
+                and max_value_masks-1,x
+                bne max_value
 
-osbyte_80_adval1: .proc
-                ldx #jleft_mask
-                ldy #jright_mask
-                jmp osbyte_80_axis
-                .endproc
+                lda os_a
+                and min_value_masks-1,x
+                bne min_value
 
-osbyte_80_adval2: .proc
-                ldx #jup_mask
-                ldy #jdown_mask
-                jmp osbyte_80_axis
-                .endproc
-
-osbyte_80_axis: .proc
-                txa
-                and os_a
-                bne minus1
-                tya
-                and os_a
-                bne plus1
 zero:
                 ldx #$00
                 ldy #$80
                 rts
 
-minus1:
+max_value:
+                ldx #$ff
+                ldy #$ff
+                rts
+
+min_value:
                 ldx #$00
                 ldy #$00
                 rts
 
-plus1:
-                ldx #$ff
-                ldy #$ff
+test_fire:
+                ldy #4          ;fake last ADC conversion channel
+                
+                lda os_a
+                and #jfire_mask
+                bne fire_yes
+fire_no:
+                ldx #0
                 rts
+
+fire_yes:
+                ldx #1
+                rts
+
+min_value_masks: .byte jright_mask,jup_mask,0,0
+max_value_masks: .byte jleft_mask,jdown_mask,0,0
                 .endproc
 
 ;-------------------------------------------------------------------------
@@ -757,78 +886,6 @@ names:
                 .text "RIGHT"
                 .text "FIRE "
                 .endblock
-
-; cmd_jstick: .proc
-;                 bcc do
-
-;                 ldx #0
-; help: .block
-;                 jsr print_following_string
-;                 .text 13,10,"  JSTICK <no> ",0
-; loop:
-;                 lda text,x
-;                 beq next_part
-;                 jsr oswrch
-;                 inx
-;                 bne loop
-; next_part:
-;                 inx
-;                 lda text,x
-;                 bne help
-;                 rts
-
-; text:
-;                 .text 0
-;                 .text "<up> <down> <left> <right> <fire>",0
-;                 .text "SETUP",0
-;                 .text "TEST",0
-;                 .text 0
-                
-;                 .endblock
-
-; do:
-;                 jsr must_be_valid_hw
-;                 jsr reset_default_vectors
-;                 lda #$77
-;                 jsr osbyte      ;close *SPOOL/*EXEC handles
-;                 jsr find_string_tail
-;                 bcc +
-; key_missing_error:
-;                 ldx #errors_table.key_missing_offset
-;                 jmp do_error
-; +
-;                 jsr strtoi
-;                 tax
-;                 dex
-;                 cpx #4
-;                 bcs key_missing_error ;???
-;                 stx strtoi_value
-
-;                 tya
-;                 pha             ;save string offset
-                
-;                 ldy #State.jflags
-;                 jsr read_state
-;                 and #$fc
-;                 ora strtoi_value
-;                 ora #$40
-;                 jsr write_state
-
-;                 pla             ;restore string offset
-;                 pha             ;save string offset
-;                 tay             ;Y=string offset
-
-;                 ldx #commands_table.jstick_subcmds_offset
-;                 jsr find_command
-
-                
-                
-; setup:
-; test:                
-;                 ldx #errors_table.todo_offset
-;                 jmp do_error
-;                 rts
-;                 .endproc
 
 ;-------------------------------------------------------------------------
 
@@ -1547,7 +1604,6 @@ read_joystick_master: .proc
                 tsb acccon
                 lda joystick_fred_offsets,x
                 tax
-                stx $70
                 lda $fc00,x
                 plx
                 stx acccon
