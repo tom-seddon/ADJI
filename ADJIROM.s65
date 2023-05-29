@@ -860,11 +860,80 @@ osbyte_unhandled:
 ;
 osbyte_81_master: .proc
                 .cpu '65c02'
+
+                ; Skip if jkeys bit not set.
+                lda acccon
+                pha
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+                lda (os_seiwk)
+                and #State.jflags.jkeys_mask
+                cmp #1          ;C=1 if set
+                pla
+                sta acccon
+
+                ; Defer to default OSBYTE if jkeys off.
                 ldx os_x
-                ldy os_y
-                bpl timeout
                 lda os_a
+                ldy os_y
+                bcc jmp_default_osbyte.with_p_already_pushed
+
+                ; Go to timeout case if Y<$80
+                bpl timeout
+
+                ; Call default OSBYTE if Y!=$ff
+                cpy #$ff
+                bne jmp_default_osbyte.with_p_already_pushed
+
+                ; Call default OSBYTE for the X=$00 Y=$FF version
+                ; call.
+                cpx #0
+                beq jmp_default_osbyte.with_p_already_pushed
+
+                ; Is this one of the jkeys?
+                lda acccon
+                pha
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+                lda #1
+                sta os_y
+                ldy #State.action_keys
+
+                lda os_x
+                eor #$ff        ;convert to internal key
+poll_key_loop:
+                cmp (os_seiwk),y
+                beq found_key
+                asl os_y
+                iny
+                cpy #State.action_keys+num_actions
+                bne poll_key_loop
+not_found_key:
+                pla
+                sta acccon
+
+                lda #$81
+                ldy #$ff
+                ldx os_x
+                
                 jmp jmp_default_osbyte.with_p_already_pushed
+
+found_key:
+                lda (os_seiwk)
+                and #3
+                tay
+                ldx joystick_fred_offsets,y
+                lda $fc00,x
+                and os_y
+                beq not_found_key
+
+                pla
+                sta acccon
+                ldx #$ff
+                ldy #$ff
+                lda #$81
+                plp
+                rts
 
 timeout:
                 ; 
