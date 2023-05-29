@@ -107,26 +107,26 @@ can later use to set up the same keys again.
 
 Negative INKEY values are as follows. Keys common to all systems:
 
-| Key | Dec | Hex | Key | Dec | Hex | Key | Dec | Hex |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | -66 | &BE | S | -82 | &AE | - | -24 | &E8 |
-| B | -101 | &9B | T | -36 | &DC | ; | -88 | &A8 |
-| C | -83 | &AD | U | -54 | &CA | : | -73 | &B7 |
-| D | -51 | &CD | V | -100 | &9C | , | -103 | &99 |
-| E | -35 | &DD | W | -34 | &DE | . | -104 | &98 |
-| F | -68 | &BC | X | -67 | &BD | / | -105 | &97 |
-| G | -84 | &AC | Y | -69 | &BB | SPACE | -99 | &9D |
-| H | -85 | &AB | Z | -98 | &9E | ESCAPE | -113 | &8F |
-| I | -38 | &DA | 0 | -40 | &D8 | DELETE | -90 | &A6 |
-| J | -70 | &BA | 1 | -49 | &CF | RETURN | -74 | &B6 |
-| K | -71 | &B9 | 2 | -50 | &CE | CURSOR UP | -58 | &C6 |
-| L | -87 | &A9 | 3 | -18 | &EE | CURSOR DOWN | -42 | &D6 |
-| M | -102 | &9A | 4 | -19 | &ED | CURSOR LEFT | -26 | &E6 |
-| N | -86 | &AA | 5 | -20 | &EC | CURSOR RIGHT | -122 | &86 |
-| O | -55 | &C9 | 6 | -53 | &CB | COPY | -106 | &96 |
-| P | -56 | &C8 | 7 | -37 | &DB | SHIFT | -1 | &FF |
-| Q | -17 | &EF | 8 | -22 | &EA | CTRL | -2 | &FE |
-| R | -52 | &CC | 9 | -39 | &D9 | CAPS LOCK | -65 | &BF |
+| Key | Dec | Hex || Key | Dec | Hex || Key | Dec | Hex |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A | -66 | &BE || S | -82 | &AE || - | -24 | &E8 |
+| B | -101 | &9B || T | -36 | &DC || ; | -88 | &A8 |
+| C | -83 | &AD || U | -54 | &CA || : | -73 | &B7 |
+| D | -51 | &CD || V | -100 | &9C || , | -103 | &99 |
+| E | -35 | &DD || W | -34 | &DE || . | -104 | &98 |
+| F | -68 | &BC || X | -67 | &BD || / | -105 | &97 |
+| G | -84 | &AC || Y | -69 | &BB || SPACE | -99 | &9D |
+| H | -85 | &AB || Z | -98 | &9E || ESCAPE | -113 | &8F |
+| I | -38 | &DA || 0 | -40 | &D8 || DELETE | -90 | &A6 |
+| J | -70 | &BA || 1 | -49 | &CF || RETURN | -74 | &B6 |
+| K | -71 | &B9 || 2 | -50 | &CE || CURSOR UP | -58 | &C6 |
+| L | -87 | &A9 || 3 | -18 | &EE || CURSOR DOWN | -42 | &D6 |
+| M | -102 | &9A || 4 | -19 | &ED || CURSOR LEFT | -26 | &E6 |
+| N | -86 | &AA || 5 | -20 | &EC || CURSOR RIGHT | -122 | &86 |
+| O | -55 | &C9 || 6 | -53 | &CB || COPY | -106 | &96 |
+| P | -56 | &C8 || 7 | -37 | &DB || SHIFT | -1 | &FF |
+| Q | -17 | &EF || 8 | -22 | &EA || CTRL | -2 | &FE |
+| R | -52 | &CC || 9 | -39 | &D9 || CAPS LOCK | -65 | &BF |
 
 Keys specific to B/Master:
 
