@@ -1059,8 +1059,14 @@ keyv_master: .proc
                 pha             ;re-save P
                 and #%01000001  ;separate C+V
                 cmp #%00000001  ;check for C=1 V=0
-                bne jmp_default_keyv.with_p_already_pushed
+                beq scan
 
+                ; Forward to default KEYV.
+                ldx os_x
+                ldy os_y
+                jmp jmp_default_keyv.with_p_already_pushed
+
+scan:
                 ; Check for keyboard scan mode.
                 lda os_x
                 bpl scan_multiple_keys ;taken if scanning for multiple
