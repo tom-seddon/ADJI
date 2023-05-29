@@ -107,8 +107,8 @@ can later use to set up the same keys again.
 
 Negative INKEY values are as follows:
 
-| Key | Dec | Hex | Key | Dec | Hex |
-| --- | --- | --- | --- | --- | ---
+| Key | Dec | Hex | Key | Dec | Hex | Key | Dec | Hex |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A | -66 | &BE | @ | -72 | &B8 | NUM 0 | -107 | &95 |
 | B | -101 | &9B | [ | -57 | &C7 | NUM 1 | -108 | &94 |
 | C | -83 | &AD | \ | -121 | &87 | NUM 2 | -125 | &83 |
