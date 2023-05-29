@@ -1,6 +1,10 @@
                 .include "submodules/beeb/include/beeb.s65"
                 .edef '\\','\'
 
+fall_through_to: .macro dest
+                .cerror *!=\dest,'fallthrough broke...'
+                .endmacro
+
 ;-------------------------------------------------------------------------
 
 default_vectors_ptr=$ffb7
@@ -13,11 +17,21 @@ os_y=$f1 ; Y value for osbyte/osword
 ; disabled
 os_seiwk=$fa
 
+; only safe to use with IRQs disabled!
+; os_seia=$fc
+
+; Fortunately the same on Electron OS 1.00 and Master MOS.
+os_auto_repeat_countdown=$e7
+os_auto_repeat_period=$255
+                
 ; Routines that do PLA:<<restore ROM>>:PLA:PLP:RTS - as is part of the
 ; extended vector handling mechanism.
 os_restore_rom_master=$ffa4
 os_restore_rom_electron=$ff9c
 
+line_input_pblock=$150
+line_input_data=$155
+                
 ;-------------------------------------------------------------------------
 ;
 ; See https://beebwiki.mdfs.net/OSBYTEs
@@ -25,7 +39,7 @@ os_restore_rom_electron=$ff9c
 ; Placeholder OSBYTE used to indicate that the ROM is actually being
 ; entered due to KEYV.
 keyv_osbyte=83
-                
+
 ;-------------------------------------------------------------------------
 
 brkbuf=$100
@@ -35,26 +49,71 @@ rom_ver='0.01'
 
 default_overlay_address=$150
                 
-;-------------------------------------------------------------------------
+; Up=0, Down=1, Left=2, Right=3, Fire=4
+num_actions=5
 
+;-------------------------------------------------------------------------
+;
+; ROM state logical layout. Pass offsets into this struct into
+; read_state/write_state.
+; 
 State: .struct
-jflags: .fill 1
-up: .fill 1
-down: .fill 1
-left: .fill 1
-right: .fill 1
-fire: .fill 1
+jflags: .block
+                
+; Index of joystick interface to use.
+jindex_mask=%00000011
+                
+; If set, treat joystick inputs as keyboard inputs.
+jkeys_mask=%00000100
+                
+; If set, treat joystick inputs as analogue inputs.
+jon_mask=%01000000
+                .fill 1
+                .endblock
+; Keys are stored as internal key numbers. See AUG p 142.
+action_keys: .fill num_actions
                .endstruct
+                .cerror State.jflags!=0,'State jflags must be at offset 0'
+
+;-------------------------------------------------------------------------
+;
+; ROM state on Master 128 is stored in a page in HAZEL. Layout just as
+; per the struct.
+;
 
 ; OSBYTE 209 (&D1) is reserved for the speech system [MasRef D.2-67]
-master_spare=$0261
-                
-elk_jflags=$0290                ;
-elk_up=$02a8                    ;keyboard
-elk_down=$02a9                  ;keyboard
-elk_left=$02aa                  ;lower-priority BASIC
+; master_spare=$0261
+
+;-------------------------------------------------------------------------
+;
+; ROM state on Electron.
+;
+; The various bytes are stored in page 2, in locations that Electron
+; OS 1.00 doesn't use.
+;
+; $0290 is used by the Slogger Electron Expansion ROM as follows:
+;
+; bit 6 = ADC/digital joystick select
+; bits 0/1 = digital joystick index
+;
+; The ADJI ROM jflags are compatible.
+;
+; Also unused on Electron:
+;
+; $0261 - "speech suppression status" - unused in practice?
+; $027e - unused
+; $2082 - used by MRB??
+; $028a - used by MRB??
+; $028b - used by MRB??
+; 
+elk_jflags=$0290                ;unused by Electron OS
+elk_up=$02a8                    ;ROM flags for keyboard
+elk_down=$02a9                  ;ROM flags for keyboard
+elk_left=$02aa                  ;ROM flags for lower-priority BASIC
 elk_right=$02f5                 ;unused by Electron OS
 elk_fire=$02f6                  ;unused by Electron OS
+
+;-------------------------------------------------------------------------
 
 machine_type_other=0
 machine_type_electron=1
@@ -65,6 +124,7 @@ jdown_mask=2
 jleft_mask=4
 jright_mask=8
 jfire_mask=16
+jall_mask=jfire_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
                 
 ;-------------------------------------------------------------------------
 
@@ -90,6 +150,7 @@ struct_section: .macro
                 .union
                 .struct_section cmd_jtest_workspace
                 .struct_section cmd_jon_workspace
+                .struct_section cmd_jkeys_workspace
                 .endunion
                 
                 .cerror *>$b0,'zp overflow'
@@ -99,13 +160,15 @@ struct_section: .macro
 *=$b0
                 ; Leaf routines that only use transient zp workspace
                 ; and make no FS calls (or can survive their workspace
-                ; being zapped if one is made)
-                .union
+                ; being zapped if one is made).
+                ;
+                ; This region isn't a union, as space here is a bit
+                ; less tight than in $a8...$af.
                 .struct_section print_following_string_workspace
                 .struct_section find_command_workspace
                 .struct_section reset_default_vectors_workspace
+                .struct_section install_xvector_workspace
                 .struct_section read_or_write_state_workspace
-                .endunion
                 .cerror *>$c0,'FS scratch zp overflow'
 
 ;-------------------------------------------------------------------------
@@ -160,6 +223,7 @@ cmds_offset=*-command_table
                 .command_table_entry "JON",cmd_jon,help_table.jon_offset
                 .command_table_entry "JOFF",cmd_joff,help_table.none_offset
                 .command_table_entry "JKEYS",cmd_jkeys,help_table.jkeys_offset
+                .command_table_entry "JSTATE",cmd_jstate,help_table.none_offset
                 .command_table_entry "JTEST",cmd_jtest,help_table.jtest_offset
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
                 .byte 0
@@ -171,9 +235,9 @@ jtest_offset=*-help_table
 none_offset=*-help_table
                 .text 0
 jon_offset=*-help_table
-                .text ' <no> (O)',0
+                .text ' <no> X|<addr>',0
 jkeys_offset=*-help_table
-                .text ' <no> (<up> <down> <left> <right> <fire>)',0
+                .text ' <no> <up> <down> <left> <right> <fire> X|<addr>',0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -199,6 +263,7 @@ electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
 ;-------------------------------------------------------------------------
 
 key_table_entry: .macro ascii,name,key_number
+                .cerror (\key_number&$80)!=0,'oops'
                 .byte \ascii
                 .text \name
                 .byte \key_number|$80
@@ -462,37 +527,114 @@ cmd_joff:
 cmd_jon: .proc
                 .section cmd_jon_workspace
 joystick_index: .fill 1
-use_overlay: .fill 1
-xvectors: .fill 2
+yval: .fill 1
                 .endsection
 
                 jsr must_be_valid_hw
 
+                jsr reset_default_vectors
+
                 jsr parse_jno
                 sta joystick_index
 
-                lda #$80
-                sta use_overlay
+                sty yval
+                
+                ldy #State.jflags
+                jsr read_state
+                and #~(State.jflags.jindex_mask|State.jflags.jkeys_mask|State.jflags.jon_mask)
+                ora #State.jflags.jon_mask
+                ora joystick_index
+                jsr write_state
+                
+                ldy yval
+                .fall_through_to handle_install_mode
+                .endproc
 
+handle_install_mode: .proc
                 jsr find_string_tail
-                bcs got_mode
-
-                and #$df
-                cmp #'O'
-                beq got_mode
-                cmp #'X'
-                beq dont_use_overlay
+                bcc +
 
                 ldx #errors_table.bad_mode
                 jmp do_error
 
-dont_use_overlay:
-                asl use_overlay
-got_mode:
-                bit use_overlay
-                bmi install_overlay
++
+                and #$df
+                cmp #'X'
+                beq install_xvector
+                jsr strtoi
+                .fall_through_to install_overlay
+                .endproc
 
-install_xvector:
+;-------------------------------------------------------------------------
+;
+; Install overlay routines.
+;
+; Entry: (strtoi_value) = dest pointer
+;        state jflags
+; 
+install_overlay: .proc
+                jsr must_be_valid_hw
+                bvs +
+                ldx #errors_table.electron_todo_offset
+                jmp do_error
++
+                ldy #size(overlay_master)-1
+loop:
+                lda overlay_master,y
+                sta (strtoi_value),y
+                dey
+                bpl loop
+
+                ; Fix up ROMSEL value.
+                ldy #overlay_master.rom_offset
+                lda $f4
+                sta (strtoi_value),y
+
+                ; Fix up workspace page.
+                tay
+                lda $df0,y
+                ldy #overlay_master.workspace_page
+                sta (strtoi_value),y
+
+                ; Point BYTEV to the right place.
+                lda #overlay_master.osbyte_entry_offset
+                ldx #<bytev
+                jsr set_overlay_vector
+
+                ; Maybe point KEYV to the right place.
+                ldy #State.jflags
+                jsr read_state
+                and #State.jflags.jkeys_mask
+                beq keyv_done
+                lda #overlay_master.keyv_entry_offset
+                ldx #<keyv
+                jsr set_overlay_vector
+keyv_done:
+
+                rts
+
+set_overlay_vector:
+                php
+                sei
+                clc
+                adc strtoi_value+0
+                sta $200,x
+                lda strtoi_value+1
+                adc #0
+                sta $201,x
+                plp
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Install xvector routines.
+;
+; Entry: state jflags
+install_xvector: .proc
+                .section install_xvector_workspace
+xvectors: .fill 2
+                .endsection
                 lda #$a8        ;read extended vector table address
                 ldx #$00
                 ldy #$ff
@@ -508,6 +650,8 @@ install_xvector:
 
                 php
                 sei
+
+                ; BYTEV
                 lda #$ff
                 sta bytev+1
                 ldy #(<bytev)/2*3
@@ -520,19 +664,31 @@ install_xvector:
                 iny
                 lda $f4
                 sta (xvectors),y
+
+                ; KEYV
+                ldy #State.jflags
+                jsr read_state
+                and #State.jflags.jkeys_mask
+                beq keyv_done
+
+                lda #$ff
+                sta keyv+1
+                ldy #(<keyv)/2*3
+                sty keyv+0
+                lda #<handle_keyv_xvector_master
+                sta (xvectors),y
+                iny
+                lda #>handle_keyv_xvector_master
+                sta (xvectors),y
+                iny
+                lda $f4
+                sta (xvectors),y
+keyv_done:
+                
                 plp
                 rts
-
-; handle_osbyte_routines:
-;                 .word handle_osbyte_electron
-;                 .word handle_osbyte_master
-                
-install_overlay:
-                ldx #errors_table.todo_offset
-                jmp do_error
-                
                 .endproc
-
+                
 ;-------------------------------------------------------------------------
 ;
 ; Handle OSBYTE on Master 128 when called via extended vector.
@@ -541,24 +697,16 @@ install_overlay:
 ; 
 handle_osbyte_xvector_master: .proc
                 .cpu '65c02'
-                cmp #$80
-                bne default     ;taken if certainly not ADVAL
-                cpx #5
-                bcs default     ;taken if non-ADVAL OSBYTE $80
-                
+                php
+                sei
                 sta os_a
                 stx os_x
                 sty os_y
-                php
-                sei
                 ldx $f4
                 lda $df0,x
                 sta os_seiwk+1
                 stz os_seiwk+0
                 jmp handle_osbyte_master
-
-default:
-                jmp jmp_default_osbyte
                 .cpu 'default'
                 .endproc
 
@@ -583,6 +731,9 @@ workspace_page=*+1-overlay_master
                 lda #$ff
                 jmp handle_osbyte_overlay_master
                 .endblock
+
+                ; Unlikely
+                .cerror size(overlay_master)>128,'overlay too large'
 
 ;-------------------------------------------------------------------------
 ;
@@ -641,7 +792,26 @@ handle_overlay_exit_master:
                 plx             ;S = ROMSEL A P RetL RetH
                 jmp os_restore_rom_master
                 .cpu 'default'
-                
+
+;-------------------------------------------------------------------------
+;
+; KEYV xvector handler for Master 128
+;
+; Entry: just as per KEYV
+handle_keyv_xvector_master: .proc
+                .cpu '65c02'
+                php
+                sei
+                sta os_a
+                stx os_x
+                sty os_y
+                ldx $f4
+                lda $df0,x
+                sta os_seiwk+1
+                stz os_seiwk+0
+                jmp keyv_master
+                .cpu 'default'                
+                .endproc
 
 ;-------------------------------------------------------------------------
 ;
@@ -655,17 +825,182 @@ handle_overlay_exit_master:
 handle_osbyte_master:
                 lda os_a
 
+                cmp #keyv_osbyte
+                beq keyv_master
+
                 cmp #$80
                 beq osbyte_80_master
-                
-                ; ...?
+
+                cmp #$81
+                beq osbyte_81_master
 osbyte_unhandled:
                 ldx os_x
                 ldy os_y
                 plp
                 jmp jmp_default_osbyte
 
-osbyte_80_master:
+;-------------------------------------------------------------------------
+;
+; OSBYTE $81 handler for Master 128.
+;
+; Entry: A = $81, ?os_a = $81
+;        ?os_x, ?os_y = OSBYTE $80 entry arguments
+;        (os_seiwk) = pointer to workspace in HAZEL
+;        IRQs disabled
+;        Stack: [Input P; appropriate return address]
+;
+osbyte_81_master: .proc
+                .cpu '65c02'
+                ldx os_x
+                ldy os_y
+                bpl timeout
+                lda os_a
+                jmp jmp_default_osbyte.with_p_already_pushed
+
+timeout:
+                ; 
+                ; Form negated timeout in Y/X.
+                tya
+                eor #$ff
+                tay
+                txa
+                eor #$ff
+                tax
+
+loop:
+                ; Save timeout.
+                pla             ;old IRQ state [RL RH]
+                pha             ;save old IRQ state [P RL RH]
+                phy             ;[Y P RL RH]
+                phx             ;[X Y P RL RH]
+                pha             ;save old IRQ state again [P X Y P RL RH]
+
+                ; Read joystick.
+                lda acccon
+                pha             ;[ACCCON P X Y P RL RH]
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+                lda (os_seiwk)
+                and #3
+                tay
+                ldx joystick_fred_offsets,y
+                lda $fc00,x
+                and #jall_mask
+                beq try_osbyte  ;taken if obviously nothing pressed
+
+                ; Find state offset for action.
+                ;
+                ; TODO: there'll probably be room to have this in a
+                ; table.
+                ldy #State.action_keys-1
+find_index_loop:
+                iny
+                lsr a
+                bcc find_index_loop
+
+                lda (os_seiwk),y
+                bpl jkey_pressed
+                
+try_osbyte:
+                pla             ;[P X Y P RL RH]
+                sta acccon
+                
+                lda os_seiwk+1
+                plp             ;Restore IRQ state [X Y P RL RH]
+                pha             ;Save workspace ptr MSB [WH X Y P RL RH]
+
+                ldy #0
+                ldx #1
+                lda #$81
+                jsr jmp_default_osbyte
+                cpy #$ff
+                bne kkey_pressed
+
+                lda #1
+                sta os_auto_repeat_countdown
+
+                ; Restore state.
+                pla             ;Restore workspcae ptr MSB [X Y P RL RH]
+                sei
+                sta os_seiwk+1
+                stz os_seiwk+0
+
+next:
+                ; Increment timeout, and keep going until 0.
+                plx             ;[Y P RL RH]
+                ply             ;[P RL RH]
+                
+                inx
+                bne loop
+                iny
+                bne loop
+
+                ; X=0, Y=0. Timed out. Return with C=1 and Y=$ff.
+                plp             ;[RL RH]
+                dey
+                sec
+                rts
+                .cpu 'default'
+
+kkey_pressed:
+                pla             ;discard workspace ptr MSB [X Y P RL RH]
+                pla             ;discard counter LSB [Y P RL RH]
+                pla             ;discard counter MSB [P RL RH]
+                plp             ;restore IRQ state [RL RH]
+                dey             ;Y=0
+                lda #$81        ;A is preserved
+                clc
+                rts
+
+jkey_pressed:
+                ldx os_auto_repeat_countdown
+                beq reset_auto_repeat_countdown
+                dec os_auto_repeat_countdown
+                bne try_osbyte
+reset_auto_repeat_countdown:
+                ldx os_auto_repeat_period
+                stx os_auto_repeat_countdown
+                
+                pha             ;save internal key number [K ACCCON P X Y P RL RH]
+                lda #$ac        ;Keyboard translation table address
+                                ;AUG p 183
+                ldx #$00
+                ldy #$ff
+                jsr osbyte
+                sei
+                stx os_seiwk+0  ;keyboard translation table LSB
+                sty os_seiwk+1  ;keyboard translation table MSB
+                pla             ;restore internal key number [ACCCON P X Y P RL RH]
+                tay             ;Y=internal key number
+                lda (os_seiwk),y
+                bne +           ;taken if not TAB
+                lda #9          ;TODO: proper TAB support
++
+                tax             ;X = ASCII value of key pressed
+                pla             ;get old ACCCON value [P X Y P RL RH]
+                sta acccon
+                pla             ;discard old IRQ state copy [X Y P RL RH]
+                pla             ;discard counter LSB [Y P RL RH]
+                pla             ;discard counter MSB [P RL RH]
+                plp             ;restore old IRQ state [RL RH]
+                lda os_a
+                clc
+                rts
+                
+                .endproc
+
+;        
+;-------------------------------------------------------------------------
+;
+; OSBYTE $80 handler for Master 128.
+;
+; Entry: A = $80, ?os_a = $80
+;        ?os_x, ?os_y = OSBYTE $80 entry arguments
+;        (os_seiwk) = pointer to workspace in HAZEL
+;        IRQs disabled
+;        Stack: [Input P; appropriate return address]
+; 
+osbyte_80_master: .proc
                 ; Bail if not ADVAL.
                 ldx os_x
                 cpx #5
@@ -682,6 +1017,8 @@ osbyte_80_master:
                 ; Fetch joystick index.
                 ldy #State.jflags
                 lda (os_seiwk),y
+                bit #State.jflags.jon_mask
+                beq default
                 and #3
 
                 ; ?os_a = joystick value
@@ -700,12 +1037,163 @@ osbyte_80_master:
                 
                 jmp osbyte_80_generic
                 .cpu 'default'
+
+default:
+                pla
+                sta acccon
+                lda os_a
+                jmp osbyte_unhandled
+                .endproc
+;-------------------------------------------------------------------------
+;
+; KEYV handler for Master 128.
+;
+; Entry: A = keyv_osbyte
+;        ?os_x, ?os_y = KEYV arguments
+;        (os_seiwk) = pointer to workspace in HAZEL
+;        IRQs disabled
+;        Stack: [Input P; appropriate return address]
+keyv_master: .proc
+                .cpu '65c02'
+                pla             ;restore P
+                pha             ;re-save P
+                and #%01000001  ;separate C+V
+                cmp #%00000001  ;check for C=1 V=0
+                bne jmp_default_keyv.with_p_already_pushed
+
+                ; Check for keyboard scan mode.
+                lda os_x
+                bpl scan_multiple_keys ;taken if scanning for multiple
+                                       ;keys
+
+scan_single_key: .block
+                ; Convert to internal key number.
+                and #$7f
+                sta os_x
+                
+                ; Set up ACCCON.
+                lda acccon
+                pha
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+
+                ; Read joystick flags into X
+                lda (os_seiwk)
+                bit #State.jflags.jkeys_mask
+                beq default
+                and #3
+                tax
+                ldy joystick_fred_offsets,x
+                ldx $fc00,y
+
+                ldy #State.action_keys+num_actions-1
+loop:
+                lda os_x        ;key of interest
+                cmp (os_seiwk),y
+                bne next        ;taken if not this jkey
+                txa             ;get joystick flags
+                and joystick_action_masks-State.action_keys,y
+                bne pressed     ;taken if this jkey pressed
+next:
+                dey
+                bne loop
+
+default:
+                ; Restore ACCCON.
+                pla
+                sta acccon
+
+                ; Key was not one of the joystick keys, so forward the
+                ; call on to KEYV.
+                lda os_x
+                ora #$80        ;reinstate bit 7, masked out above
+                tax
+                lda os_a
+                ldy os_y
+                jmp jmp_default_keyv.with_p_already_pushed
+
+pressed:
+                ; Restore ACCCON.
+                pla
+                sta acccon
+
+                ; Report key pressed.
+                lda os_a
+                ldx #$ff
+                ldy os_y
+                plp
+                rts
+                .endblock
+                
+scan_multiple_keys: .block
+                lda os_x
+                pha
+                lda os_seiwk+1
+                pha
+                sec
+                clv
+                ldx os_x
+                jsr jmp_default_keyv
+
+                ; Save KEYV result.
+                stx os_y
+
+                ; Restore old state: IRQs disabled, os_seiwk set up,
+                ; os_x as per entry.
+                sei
+                stz os_seiwk+0
+                pla
+                sta os_seiwk+1
+                pla
+                sta os_x
+
+                ; Set up ACCCON.
+                lda acccon
+                pha
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+
+                ; Read joystick flags.
+                lda (os_seiwk)
+                and #3
+                tax
+                ldy joystick_fred_offsets,x
+                ldx $fc00,y
+                ldy #State.action_keys+num_actions-1
+loop:
+                txa             ;A=joystick flags
+                and joystick_action_masks-State.action_keys,y
+                beq next        ;taken if not pressed
+
+                lda (os_seiwk),y ;get key for this action
+                cmp os_x         ;within scan range?
+                bcc next         ;taken if not
+                beq next         ;taken if not
+                cmp os_y         ;existing result covers it?
+                bcs next         ;taken if so
+                sta os_y
+
+next:
+                dey
+                bne loop
+
+                ; Restore old ACCCON.
+                pla
+                sta acccon
+
+                ldx os_y
+                lda os_a
+                plp
+                rts
+                .endblock
+                .endproc
                 
 ;-------------------------------------------------------------------------
 ;
-; Handle OSBYTE $80, X=0, Y<=4
+; Handle OSBYTE $80, X<=4
 ;
 ; Entry: ?os_a = value read from joystick
+;        X = X value for OSBYTE $80 call
 ;        
 osbyte_80_generic: .proc
                 cpx #0
@@ -756,15 +1244,26 @@ max_value_masks: .byte jleft_mask,jdown_mask,0,0
 ; 
 ; jmp_default_osbyte
 ;
-jmp_default_osbyte:
+jmp_default_osbyte: .proc
                 php
                 sei
+with_p_already_pushed:
                 pha
                 sty os_y
                 ldy #<bytev
                 bne jmp_default_vector_routine
-
-jmp_default_vector_routine:
+                .endproc
+                
+jmp_default_keyv: .proc
+                php
+                sei
+with_p_already_pushed:
+                pha
+                sty os_y
+                ldy #<keyv
+                .cerror *!=jmp_default_vector_routine,'fallthrough broke'
+                .endproc
+jmp_default_vector_routine: .proc
                 lda default_vectors_ptr+0
                 sta os_a
                 lda default_vectors_ptr+1
@@ -780,13 +1279,52 @@ jmp_default_vector_routine:
                 pla             ;restore input A
                 plp             ;restore input P
                 jmp (os_a)      ;call routine
+                .endproc
                 
 ;-------------------------------------------------------------------------
 
-cmd_jkeys:
-                ldx #errors_table.todo_offset
-                jmp do_error
+cmd_jkeys: .proc
+                .section cmd_jkeys_workspace
+index: .fill 1
+yval: .fill 1
+state_index: .fill 1
+                .endsection
 
+                jsr parse_jno
+                sta index
+                sty yval
+
+                ldy #State.jflags
+                jsr read_state
+                and #~(State.jflags.jindex_mask|State.jflags.jkeys_mask|State.jflags.jon_mask)
+                ora #State.jflags.jkeys_mask
+                ora index
+                jsr write_state
+
+                lda #State.action_keys
+                sta index
+
+loop:
+                ldy yval
+                jsr strtoi
+                sty yval
+
+                ; convert to internal key number
+                eor #$ff
+                and #$7f
+
+                ldy index
+                jsr write_state
+
+                iny
+                sty index
+                cpy #State.action_keys+num_actions
+                bne loop
+
+                ldy yval
+                jmp handle_install_mode
+                .endproc
+                
 ;-------------------------------------------------------------------------
 
 cmd_jtest: .proc
@@ -909,6 +1447,33 @@ ktest_loop:
                 
                 .endproc
 
+;-------------------------------------------------------------------------
+
+cmd_jstate: .proc
+                ldx #0
+loop:
+                jsr print_following_string
+                .text '+&',0
+
+                txa
+                jsr print_hex_byte
+
+                jsr print_following_string
+                .text ': &',0
+
+                txa
+                tay
+                jsr read_state
+                jsr print_hex_byte
+
+                jsr osnewl
+
+                inx
+                cpx #size(State)
+                bne loop
+                rts
+                .endproc
+                
 ;-------------------------------------------------------------------------
 ;
 ; Switch cursor on (con) or off (coff)
@@ -1292,7 +1857,7 @@ state_ptr: .fill 2
 ;
 ; Read 1 byte from the ROM state.
 ;
-; Entry: Y = offset
+; Entry: Y = offset into State struct
 ; Exit: A = value read
 ; Preserves: X/Y
 read_state: .proc
@@ -1306,7 +1871,7 @@ read_state_electron:
                 ldx state_ptr+0
                 rts
 
-read_state_master:
+master:
                 .cpu '65c02'
                 phx
                 ldx $f4
@@ -1324,7 +1889,7 @@ read_state_master:
 ; Write 1 byte to the ROM state.
 ;
 ; Entry: A = value to write
-;        Y = offset
+;        Y = offset into State struct
 ; Preserves: A/X/Y
 write_state: .proc
                 jsr must_be_valid_hw
@@ -1370,11 +1935,11 @@ elk_state_offsets: .proc
 ; Exit: A = LSB of value read
 ;       ($f2),y = pointer to remainder of string
 ; Preserves: X
-strtoi:         .proc
                 .section strtoi_workspace
 strtoi_value: .fill 2
                 .endsection
                 
+strtoi:         .proc
                 jsr find_string_tail
                 beq bad_hex
                 lda #0
@@ -1572,6 +2137,54 @@ restore_default_vector_byte:
 
 ;-------------------------------------------------------------------------
 ;
+; Exit: Stack = [old_ACCCON old_P]
+;       IRQs disabled
+;       (os_seiwk) points to workspace
+; Preserves: A/X/Y
+setup_acccon_master: .proc
+                .cpu '65c02'
+                pha
+                php
+                pha
+                phx
+                tsx
+
+                ;
+                ; | Addr   | Before | After |
+                ; |--------|--------|-------|
+                ; | $101,x | old X  | old X
+                ; | $102,x | old A  | old A
+                ; | $103,x | old P  | retL
+                ; | $104,x | old A  | retH
+                ; | $105,x | retL   | old ACCCON
+                ; | $106.x | retH   | old P
+
+                lda $106,x
+                sta $104,x
+                lda $103,x
+                sta $106,x
+                lda $105,x
+                sta $103,x
+                lda acccon
+                sta $105,x
+
+                sei
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+
+                ldx $f4
+                lda $df0,x
+                sta os_seiwk+1
+                stz os_seiwk+0
+
+                pla
+                plx
+                rts
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+;
 ; Read joystick.
 ;
 ; Entry: X = joystick index, 0-3
@@ -1627,6 +2240,62 @@ read_joystick_elk:
 
 joystick_fred_offsets:
                 .byte $c0,$d0,$e0,$f0
+
+joystick_action_masks:
+                .byte %00000001
+                .byte %00000010
+                .byte %00000100
+                .byte %00001000
+                .byte %00010000
+                
+;-------------------------------------------------------------------------
+;
+; Read a (short - max 5 chars) line
+;
+; Exit: $line_input_data = input read
+; 
+read_line: .proc
+                lda #<line_input_data
+                sta line_input_pblock+0
+                lda #>line_input_data
+                sta line_input_pblock+1
+                lda #5
+                sta line_input_pblock+2
+                lda #32
+                sta line_input_pblock+3
+                lda #127
+                sta line_input_pblock+4
+                ldx #<line_input_pblock
+                ldy #>line_input_pblock
+                lda #0
+                jmp osword
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+;
+print_hex_byte: .proc
+                pha
+                lsr a
+                lsr a
+                lsr a
+                lsr a
+                jsr nybble
+                pla
+                pha
+                and #$0f
+                jsr nybble
+                pla
+                rts
+
+nybble:
+                sed
+                clc
+                adc #$90
+                adc #$40
+                cld
+                jmp oswrch
+                .endproc
                 
 ;-------------------------------------------------------------------------
 

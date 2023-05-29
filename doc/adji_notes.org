@@ -78,11 +78,9 @@ updated Electron Expansion ROM, too.)
 
 # ADJI memory usage - Master 128
 
-Software trampling on page $D is much rarer.
-
-Skip the overlay, ideally, and use the extended vector table to
-re-route KEYV and BYTEV. Stuff will sometimes reset this, but what can
-you do.
+Multi-load stuff won't do this, but it is typically safe to do ~*TAPE~
+and then overwrite page $D. So the overlay routine will still be
+necessary.
 
 Claim a dynamic workspace page in HAZEL for the settings. Bit wasteful
 (only 6/256 bytes used!), but shouldn't be a problem.
@@ -90,4 +88,15 @@ Claim a dynamic workspace page in HAZEL for the settings. Bit wasteful
 On entry to BYTEV or KEYV, HAZEL could be unmapped. Access it with
 interrupts disabled, and restore the old value.
 
+If page $D has been overwritten, the workspace address won't be known,
+so the overlay routine will have to supply this.
 
+# Games tested
+
+## StarshipCommand
+
+Works OK with extended vectors
+
+## Aviator
+
+Crashes - looks like it scribbles over page $d!
