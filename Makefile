@@ -36,6 +36,7 @@ build:
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJIROM"
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM.bin"
+	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM_debug.bin"
 
 ##########################################################################
 ##########################################################################
