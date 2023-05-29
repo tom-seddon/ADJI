@@ -131,7 +131,7 @@ Negative INKEY values are as follows. Keys common to all systems:
 Keys specific to B/Master:
 
 | Key | Dec | Hex || Key | Dec | Hex |
-| --- | --- | --- || --- | --- | --- |
+| --- | --- | --- | --- | --- | --- | --- |
 | @ | -72 | &B8 || NUM 0 | -107 | &95 |
 | [ | -57 | &C7 || NUM 1 | -108 | &94 |
 | \ | -121 | &87 || NUM 2 | -125 | &83 |
