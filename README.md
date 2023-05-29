@@ -105,64 +105,52 @@ values:
 `*JKSETUP` will print out a suitable `*JKEYS` command line, which you
 can later use to set up the same keys again.
 
-Negative INKEY values are as follows:
+Negative INKEY values are as follows. Keys common to all systems:
 
 | Key | Dec | Hex | Key | Dec | Hex | Key | Dec | Hex |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | -66 | &BE | @ | -72 | &B8 | NUM 0 | -107 | &95 |
-| B | -101 | &9B | [ | -57 | &C7 | NUM 1 | -108 | &94 |
-| C | -83 | &AD | \ | -121 | &87 | NUM 2 | -125 | &83 |
-| D | -51 | &CD | ] | -89 | &A7 | NUM 3 | -109 | &93 |
-| E | -35 | &DD | ^ | -25 | &E7 | NUM 4 | -123 | &85 |
-| F | -68 | &BC | _ | -41 | &D7 | NUM 5 | -124 | &84 |
-| G | -84 | &AC | TAB | -97 | &9F | NUM 6 | -27 | &E5 |
-| H | -85 | &AB | SHIFT LOCK | -81 | &AF | NUM 7 | -28 | &E4 |
-| I | -38 | &DA | f0 | -33 | &DF | NUM 8 | -43 | &D5 |
-| J | -70 | &BA | f1 | -114 | &8E | NUM 9 | -44 | &D4 |
-| K | -71 | &B9 | f2 | -115 | &8D | NUM + | -59 | &C5 |
-| L | -87 | &A9 | f3 | -116 | &8C | NUM - | -60 | &C4 |
-| M | -102 | &9A | f4 | -21 | &EB | NUM / | -75 | &B5 |
-| N | -86 | &AA | f5 | -117 | &8B | NUM # | -91 | &A5 |
-| O | -55 | &C9 | f6 | -118 | &8A | NUM * | -92 | &A4 |
-| P | -56 | &C8 | f7 | -23 | &E9 | NUM , | -93 | &A3 |
-| Q | -17 | &EF | f8 | -119 | &89 | NUM RETURN | -61 | &C3 |
-| R | -52 | &CC | f9 | -120 | &88 | NUM DELETE | -76 | &B4 |
-| S | -82 | &AE |||| NUM . | -77 | &B3 |
-| T | -36 | &DC |
-| U | -54 | &CA |
-| V | -100 | &9C |
-| W | -34 | &DE |
-| X | -67 | &BD |
-| Y | -69 | &BB |
-| Z | -98 | &9E |
-| 0 | -40 | &D8 |
-| 1 | -49 | &CF |
-| 2 | -50 | &CE |
-| 3 | -18 | &EE |
-| 4 | -19 | &ED |
-| 5 | -20 | &EC |
-| 6 | -53 | &CB |
-| 7 | -37 | &DB |
-| 8 | -22 | &EA |
-| 9 | -39 | &D9 |
-| - | -24 | &E8 |
-| ; | -88 | &A8 |
-| : | -73 | &B7 |
-| , | -103 | &99 |
-| . | -104 | &98 |
-| / | -105 | &97 |
-| SPACE | -99 | &9D |
-| ESCAPE | -113 | &8F |
-| DELETE | -90 | &A6 |
-| RETURN | -74 | &B6 |
-| CURSOR UP | -58 | &C6 |
-| CURSOR DOWN | -42 | &D6 |
-| CURSOR LEFT | -26 | &E6 |
-| CURSOR RIGHT | -122 | &86 |
-| COPY | -106 | &96 |
-| SHIFT | -1 | &FF |
-| CTRL | -2 | &FE |
-| CAPS LOCK | -65 | &BF |
+| A | -66 | &BE | S | -82 | &AE | - | -24 | &E8 |
+| B | -101 | &9B | T | -36 | &DC | ; | -88 | &A8 |
+| C | -83 | &AD | U | -54 | &CA | : | -73 | &B7 |
+| D | -51 | &CD | V | -100 | &9C | , | -103 | &99 |
+| E | -35 | &DD | W | -34 | &DE | . | -104 | &98 |
+| F | -68 | &BC | X | -67 | &BD | / | -105 | &97 |
+| G | -84 | &AC | Y | -69 | &BB | SPACE | -99 | &9D |
+| H | -85 | &AB | Z | -98 | &9E | ESCAPE | -113 | &8F |
+| I | -38 | &DA | 0 | -40 | &D8 | DELETE | -90 | &A6 |
+| J | -70 | &BA | 1 | -49 | &CF | RETURN | -74 | &B6 |
+| K | -71 | &B9 | 2 | -50 | &CE | CURSOR UP | -58 | &C6 |
+| L | -87 | &A9 | 3 | -18 | &EE | CURSOR DOWN | -42 | &D6 |
+| M | -102 | &9A | 4 | -19 | &ED | CURSOR LEFT | -26 | &E6 |
+| N | -86 | &AA | 5 | -20 | &EC | CURSOR RIGHT | -122 | &86 |
+| O | -55 | &C9 | 6 | -53 | &CB | COPY | -106 | &96 |
+| P | -56 | &C8 | 7 | -37 | &DB | SHIFT | -1 | &FF |
+| Q | -17 | &EF | 8 | -22 | &EA | CTRL | -2 | &FE |
+| R | -52 | &CC | 9 | -39 | &D9 | CAPS LOCK | -65 | &BF |
+
+Keys specific to B/Master:
+
+| Key | Dec | Hex | Key | Dec | Hex |
+| --- | --- | --- | --- | --- | --- |
+| @ | -72 | &B8 | NUM 0 | -107 | &95 |
+| [ | -57 | &C7 | NUM 1 | -108 | &94 |
+| \ | -121 | &87 | NUM 2 | -125 | &83 |
+| ] | -89 | &A7 | NUM 3 | -109 | &93 |
+| ^ | -25 | &E7 | NUM 4 | -123 | &85 |
+| _ | -41 | &D7 | NUM 5 | -124 | &84 |
+| TAB | -97 | &9F | NUM 6 | -27 | &E5 |
+| SHIFT LOCK | -81 | &AF | NUM 7 | -28 | &E4 |
+| f0 | -33 | &DF | NUM 8 | -43 | &D5 |
+| f1 | -114 | &8E | NUM 9 | -44 | &D4 |
+| f2 | -115 | &8D | NUM + | -59 | &C5 |
+| f3 | -116 | &8C | NUM - | -60 | &C4 |
+| f4 | -21 | &EB | NUM / | -75 | &B5 |
+| f5 | -117 | &8B | NUM # | -91 | &A5 |
+| f6 | -118 | &8A | NUM * | -92 | &A4 |
+| f7 | -23 | &E9 | NUM , | -93 | &A3 |
+| f8 | -119 | &89 | NUM RETURN | -61 | &C3 |
+| f9 | -120 | &88 | NUM DELETE | -76 | &B4 |
+|||| NUM . | -77 | &B3 |
 
 # Limitations/bugs
 
