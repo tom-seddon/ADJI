@@ -31,6 +31,11 @@ os_restore_rom_electron=$ff9c
 
 line_input_pblock=$150
 line_input_data=$155
+
+;-------------------------------------------------------------------------
+
+; MOS variables
+os_tab_key_code=$26b            ;OSBYTE 219 ($db)
                 
 ;-------------------------------------------------------------------------
 ;
@@ -1364,7 +1369,7 @@ reset_auto_repeat_countdown:
                 tay             ;Y=internal key number
                 lda (os_seiwk),y
                 bne +           ;taken if not TAB
-                lda #9          ;TODO: proper TAB support
+                lda os_tab_key_code
 +
                 tax             ;X = ASCII value of key pressed
                 pla             ;get old ACCCON value [P X Y P RL RH]
