@@ -29,7 +29,7 @@ build:
 	$(_V)$(SHELLCMD) mkdir "$(BUILD)"
 	$(_V)$(SHELLCMD) mkdir "$(BEEB_BUILD)"
 
-	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=false "--list=$(BUILD)/ADJIROM.lst" "--output=$(BUILD)/ADJIROM.bin" ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=false "--list=$(BUILD)/ADJIROM.lst" "--output=$(BUILD)/ADJIROM.bin" "--map=$(BUILD)/ADJIROM.map" ADJIROM.s65
 	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=true "--list=$(BUILD)/ADJIROM_debug.lst" "--output=$(BUILD)/ADJIROM_debug.bin" ADJIROM.s65
 
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJIROM"

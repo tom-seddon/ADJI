@@ -72,7 +72,7 @@ jjoy_mask=%01000000
                 .endblock
 ; Keys are stored as internal key numbers. See AUG p 142.
 action_keys: .fill num_actions
-               .endstruct
+                .endstruct
                 .cerror State.jflags!=0,'State jflags must be at offset 0'
 
 ;-------------------------------------------------------------------------
@@ -176,7 +176,14 @@ struct_section: .macro
 ;-------------------------------------------------------------------------
 
 *=$8000
-                .dsection code
+                .dsection header
+                .dsection tables
+                .dsection service
+                .dsection star
+                .dsection common
+                .dsection master_only
+                .dsection library
+                
                 .if debug
                 ; The debug ROM is for loading into sideways RAM or
                 ; similar, and can occupy the full 16 KB.
@@ -187,8 +194,9 @@ struct_section: .macro
                 .endif
                 
 ;-------------------------------------------------------------------------
+                .section header
+;-------------------------------------------------------------------------
 
-                .section code
 rom_header:
                 .byte 0,0,0     ;language entry (none)
                 jmp svc         ;service entry
@@ -205,9 +213,11 @@ rom_copyright:
                 .text '(C) 2023 Retro Hardware'
 rom_copyright_end:
                 .byte 0
-
 ;-------------------------------------------------------------------------
-
+                .endsection header
+;-------------------------------------------------------------------------
+                .section tables
+;-------------------------------------------------------------------------
 command_table_entry: .function name,routine,help_offset
 _start:
                 .cerror (routine&$8000)==0,'routine address bit 15 must be set'
@@ -375,7 +385,47 @@ keys_table:
                 .key_table_entry $7f,'NUM DELETE',key_numpad_delete
                 .key_table_entry '.','NUM .',key_numpad_stop
                 .text 0
+
+;-------------------------------------------------------------------------
+
+joystick_actions: .block
+masks:
+                .byte 1,2,4,8,16
+names:
+                ;      01234
+                .text "     "
+                .text "UP   "
+                .text "DOWN "
+                .text "LEFT "
+                .text "RIGHT"
+                .text "FIRE "
+                .endblock
+
+;-------------------------------------------------------------------------
+
+elk_state_offsets: .proc
+                .byte <elk_jflags
+                .byte <elk_up
+                .byte <elk_down
+                .byte <elk_left
+                .byte <elk_right
+                .byte <elk_fire
+                .endproc
                 
+joystick_fred_offsets:
+                .byte $c0,$d0,$e0,$f0
+
+joystick_action_masks:
+                .byte %00000001
+                .byte %00000010
+                .byte %00000100
+                .byte %00001000
+                .byte %00010000
+                
+;-------------------------------------------------------------------------
+                .endsection tables
+;-------------------------------------------------------------------------
+                .section service
 ;-------------------------------------------------------------------------
 
 svc: .proc
@@ -523,9 +573,11 @@ next:
 done:
                 rts
                 .endproc
-
 ;-------------------------------------------------------------------------
-
+                .endsection service
+;-------------------------------------------------------------------------
+                .section star
+;-------------------------------------------------------------------------
 cmd_joff:
                 jsr reset_default_vectors
                 rts
@@ -570,9 +622,251 @@ handle_install_mode: .proc
                 cmp #'X'
                 beq install_xvector
                 jsr strtoi
-                .fall_through_to install_overlay
+                jmp install_overlay
                 .endproc
 
+;-------------------------------------------------------------------------
+
+cmd_jkeys: .proc
+                .section cmd_jkeys_workspace
+index: .fill 1
+yval: .fill 1
+state_index: .fill 1
+                .endsection
+
+                jsr parse_jno
+                sty yval
+
+                jsr set_jkeys_mode
+
+                lda #State.action_keys
+                sta index
+
+loop:
+                ldy yval
+                jsr strtoi
+                sty yval
+
+                ; convert to internal key number
+                eor #$ff
+                and #$7f
+
+                ldy index
+                jsr write_state
+
+                iny
+                sty index
+                cpy #State.action_keys+num_actions
+                bne loop
+
+                ldy yval
+                jmp handle_install_mode
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_jksetup: .proc
+                .section cmd_jksetup_workspace
+yval: .fill 1
+action_index: .fill 1
+addr: .fill 1
+                .endsection
+
+                jsr reset_default_vectors
+
+                jsr parse_jno
+                pha
+                sty yval
+
+                jsr set_jkeys_mode
+
+                lda #0
+                sta action_index
+actions_loop:
+                jsr print_following_string
+                .text "Press ",0
+                
+                ldx action_index
+                jsr print_joystick_action_name
+
+                jsr print_following_string
+                .text ": ",0
+
+                jsr verbose_get_key
+                
+                jsr osnewl
+
+                clc
+                lda action_index
+                adc #State.action_keys
+                tay             ;Y=state offset
+
+                txa             ;A=INKEY
+                eor #$ff        ;A=internal key value
+                jsr write_state
+
+                inc action_index
+                lda action_index
+                cmp #num_actions
+                bne actions_loop
+
+                ; Clear buffers
+                lda #15
+                ldx #0
+                jsr osbyte
+
+                ; Print out *JKEYS command line
+                jsr print_following_string
+                .text '*JKEYS ',0
+
+                pla
+                clc
+                adc #'1'
+                jsr oswrch
+
+                ldx #State.action_keys
+print_keys_loop:
+                jsr print_following_string
+                .text ' &',0
+
+                txa
+                tay
+                jsr read_state
+                eor #$ff        ;convert to negative INKEY value
+                jsr print_hex_byte
+
+                inx
+                cpx #State.action_keys+num_actions
+                bne print_keys_loop
+
+                lda #' '
+                jsr oswrch
+
+                ; The tail hasn't been parsed yet. Just copy it out.
+                ldy yval
+print_tail_loop:
+                lda ($f2),y
+                cmp #13
+                beq print_tail_done
+                jsr oswrch
+                iny
+                bne print_tail_done
+print_tail_done:
+                jsr osnewl
+
+                ldy yval
+                jmp handle_install_mode
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+cmd_jtest: .proc
+                .section cmd_jtest_workspace
+joystick_index: .fill 1
+action_index: .fill 1
+                .endsection
+                
+                jsr parse_jno
+                sta joystick_index
+                
+                jsr print_following_string
+                .text 22,135
+                .text 31,8,5
+                .text "J O Y S T I C K   T E S T"
+                .byte 0
+
+                jsr coff
+
+loop:
+                bit $ff
+                bmi done        ;taken if Escape pressed
+
+                lda #4
+                sta action_index
+check_actions:
+                jsr print_following_string
+                .byte 31,17,0
+                
+                lda action_index
+                clc
+                adc #10         
+                jsr oswrch      ;PRINT TAB(17,Y)
+
+                ldx joystick_index
+                jsr read_joystick
+                
+                ldx action_index
+                and joystick_actions.masks,x
+                bne +
+                ldx #$ff        ;no action
++
+                jsr print_joystick_action_name
+
+                dec action_index
+                bpl check_actions
+                jmp loop
+
+done:
+                jsr con
+                lda #$7e
+                jsr osbyte
+                lda #12
+                jmp oswrch
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_ktest: .proc
+                jsr print_following_string
+                .text 'Press keys...',10,13,0
+
+ktest_loop:
+                jsr verbose_get_key
+
+                jsr print_following_string
+                .text ' | ',0
+
+                bit $ff
+                bpl ktest_loop
+
+                lda #15
+                ldx #0
+                jmp osbyte
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_jstate: .proc
+                ldx #0
+loop:
+                jsr print_following_string
+                .text '+&',0
+
+                txa
+                jsr print_hex_byte
+
+                jsr print_following_string
+                .text ': &',0
+
+                txa
+                tay
+                jsr read_state
+                jsr print_hex_byte
+
+                jsr osnewl
+
+                inx
+                cpx #size(State)
+                bne loop
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
+                .endsection star
+;-------------------------------------------------------------------------
+                .section common
 ;-------------------------------------------------------------------------
 ;
 ; Install overlay routines.
@@ -697,7 +991,10 @@ keyv_done:
                 plp
                 rts
                 .endproc
-                
+;-------------------------------------------------------------------------
+                .endsection common
+;-------------------------------------------------------------------------
+                .section master_only
 ;-------------------------------------------------------------------------
 ;
 ; OSBYTE/KEYV overlay routine for Master 128.
@@ -1085,17 +1382,6 @@ reset_auto_repeat_countdown:
 
 ;-------------------------------------------------------------------------
 ;
-; Call OSBYTE with X=$00 Y=$FF
-;
-osbyte_x00_yff:
-                ldx #0
-osbyte_yff:
-                ldy #$ff
-jmp_osbyte:
-                jmp osbyte
-                
-;-------------------------------------------------------------------------
-;
 ; OSBYTE $80 handler for Master 128.
 ;
 ; Entry: A = $80, ?os_a = $80
@@ -1296,7 +1582,58 @@ next:
                 rts
                 .endblock
                 .endproc
-                
+;-------------------------------------------------------------------------
+;
+; Exit: Stack = [old_ACCCON old_P]
+;       IRQs disabled
+;       (os_seiwk) points to workspace
+; Preserves: A/X/Y
+setup_acccon_master: .proc
+                .cpu '65c02'
+                pha
+                php
+                pha
+                phx
+                tsx
+
+                ;
+                ; | Addr   | Before | After |
+                ; |--------|--------|-------|
+                ; | $101,x | old X  | old X
+                ; | $102,x | old A  | old A
+                ; | $103,x | old P  | retL
+                ; | $104,x | old A  | retH
+                ; | $105,x | retL   | old ACCCON
+                ; | $106.x | retH   | old P
+
+                lda $106,x
+                sta $104,x
+                lda $103,x
+                sta $106,x
+                lda $105,x
+                sta $103,x
+                lda acccon
+                sta $105,x
+
+                sei
+                lda #acccon.ifj|acccon.y
+                tsb acccon
+
+                ldx $f4
+                lda $df0,x
+                sta os_seiwk+1
+                stz os_seiwk+0
+
+                pla
+                plx
+                rts
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+                .endsection master_only
+;-------------------------------------------------------------------------
+                .section common
 ;-------------------------------------------------------------------------
 ;
 ; Handle OSBYTE $80, X<=4
@@ -1350,46 +1687,6 @@ max_value_masks: .byte jleft_mask,jdown_mask,0,0
                 .endproc
 
 ;-------------------------------------------------------------------------
-; 
-; jmp_default_osbyte
-;
-jmp_default_osbyte: .proc
-                php
-with_p_already_pushed:
-                sei
-                sty os_seia         ;caution
-                ldy #<bytev
-                bne jmp_default_vector_routine
-                .endproc
-                
-jmp_default_keyv: .proc
-                php
-with_p_already_pushed:
-                sei
-                sty os_seia         ;caution
-                ldy #<keyv
-                .cerror *!=jmp_default_vector_routine,'fallthrough broke'
-                .endproc
-jmp_default_vector_routine: .proc
-                pha
-                lda default_vectors_ptr+0
-                sta os_seiwk+0
-                lda default_vectors_ptr+1
-                sta os_seiwk+1
-                lda (os_seiwk),y ;routine LSB
-                pha
-                iny
-                lda (os_seiwk),y ;routine MSB
-                sta os_seiwk+1
-                pla
-                sta os_seiwk+0
-                ldy os_seia
-                pla
-                plp
-                jmp (os_seiwk)
-                .endproc
-
-;-------------------------------------------------------------------------
 ;
 ; Adjusts jflags: jkeys set, jjoy clear, jindex set.
 ;
@@ -1408,196 +1705,6 @@ index: .fill 1
                 jmp write_state
                 .endproc
                
-;-------------------------------------------------------------------------
-
-cmd_jkeys: .proc
-                .section cmd_jkeys_workspace
-index: .fill 1
-yval: .fill 1
-state_index: .fill 1
-                .endsection
-
-                jsr parse_jno
-                sty yval
-
-                jsr set_jkeys_mode
-
-                lda #State.action_keys
-                sta index
-
-loop:
-                ldy yval
-                jsr strtoi
-                sty yval
-
-                ; convert to internal key number
-                eor #$ff
-                and #$7f
-
-                ldy index
-                jsr write_state
-
-                iny
-                sty index
-                cpy #State.action_keys+num_actions
-                bne loop
-
-                ldy yval
-                jmp handle_install_mode
-                .endproc
-
-;-------------------------------------------------------------------------
-
-cmd_jksetup: .proc
-                .section cmd_jksetup_workspace
-yval: .fill 1
-action_index: .fill 1
-addr: .fill 1
-                .endsection
-
-                jsr reset_default_vectors
-
-                jsr parse_jno
-                pha
-                sty yval
-
-                jsr set_jkeys_mode
-
-                lda #0
-                sta action_index
-actions_loop:
-                jsr print_following_string
-                .text "Press ",0
-                
-                ldx action_index
-                jsr print_joystick_action_name
-
-                jsr print_following_string
-                .text ": ",0
-
-                jsr verbose_get_key
-                
-                jsr osnewl
-
-                clc
-                lda action_index
-                adc #State.action_keys
-                tay             ;Y=state offset
-
-                txa             ;A=INKEY
-                eor #$ff        ;A=internal key value
-                jsr write_state
-
-                inc action_index
-                lda action_index
-                cmp #num_actions
-                bne actions_loop
-
-                ; Clear buffers
-                lda #15
-                ldx #0
-                jsr osbyte
-
-                ; Print out *JKEYS command line
-                jsr print_following_string
-                .text '*JKEYS ',0
-
-                pla
-                clc
-                adc #'1'
-                jsr oswrch
-
-                ldx #State.action_keys
-print_keys_loop:
-                jsr print_following_string
-                .text ' &',0
-
-                txa
-                tay
-                jsr read_state
-                eor #$ff        ;convert to negative INKEY value
-                jsr print_hex_byte
-
-                inx
-                cpx #State.action_keys+num_actions
-                bne print_keys_loop
-
-                lda #' '
-                jsr oswrch
-
-                ; The tail hasn't been parsed yet. Just copy it out.
-                ldy yval
-print_tail_loop:
-                lda ($f2),y
-                cmp #13
-                beq print_tail_done
-                jsr oswrch
-                iny
-                bne print_tail_done
-print_tail_done:
-                jsr osnewl
-
-                ldy yval
-                jmp handle_install_mode
-                .endproc
-                
-;-------------------------------------------------------------------------
-
-cmd_jtest: .proc
-                .section cmd_jtest_workspace
-joystick_index: .fill 1
-action_index: .fill 1
-                .endsection
-                
-                jsr parse_jno
-                sta joystick_index
-                
-                jsr print_following_string
-                .text 22,135
-                .text 31,8,5
-                .text "J O Y S T I C K   T E S T"
-                .byte 0
-
-                jsr coff
-
-loop:
-                bit $ff
-                bmi done        ;taken if Escape pressed
-
-                lda #4
-                sta action_index
-check_actions:
-                jsr print_following_string
-                .byte 31,17,0
-                
-                lda action_index
-                clc
-                adc #10         
-                jsr oswrch      ;PRINT TAB(17,Y)
-
-                ldx joystick_index
-                jsr read_joystick
-                
-                ldx action_index
-                and joystick_actions.masks,x
-                bne +
-                ldx #$ff        ;no action
-+
-                jsr print_joystick_action_name
-
-                dec action_index
-                bpl check_actions
-                jmp loop
-
-done:
-                jsr con
-                lda #$7e
-                jsr osbyte
-                lda #12
-                jmp oswrch
-                
-                .endproc
-
 ;-------------------------------------------------------------------------
 ;
 ; Print joystick action name, padded on the right with spaces.
@@ -1626,69 +1733,6 @@ print:
                 rts
                 .endproc
 
-;-------------------------------------------------------------------------
-
-joystick_actions: .block
-masks:
-                .byte 1,2,4,8,16
-names:
-                ;      01234
-                .text "     "
-                .text "UP   "
-                .text "DOWN "
-                .text "LEFT "
-                .text "RIGHT"
-                .text "FIRE "
-                .endblock
-
-;-------------------------------------------------------------------------
-
-cmd_ktest: .proc
-                jsr print_following_string
-                .text 'Press keys...',10,13,0
-
-ktest_loop:
-                jsr verbose_get_key
-
-                jsr print_following_string
-                .text ' | ',0
-
-                bit $ff
-                bpl ktest_loop
-
-                lda #15
-                ldx #0
-                jmp osbyte
-                
-                .endproc
-
-;-------------------------------------------------------------------------
-
-cmd_jstate: .proc
-                ldx #0
-loop:
-                jsr print_following_string
-                .text '+&',0
-
-                txa
-                jsr print_hex_byte
-
-                jsr print_following_string
-                .text ': &',0
-
-                txa
-                tay
-                jsr read_state
-                jsr print_hex_byte
-
-                jsr osnewl
-
-                inx
-                cpx #size(State)
-                bne loop
-                rts
-                .endproc
-                
 ;-------------------------------------------------------------------------
 ;
 ; Switch cursor on (con) or off (coff)
@@ -1831,191 +1875,6 @@ poll_key:
                 
 ;-------------------------------------------------------------------------
 ;
-; Cause an error.
-;
-; Entry: X = offset of error data in errors_table
-do_error: .proc
-                ldy #0
-                sty brkbuf
-                dex
-                dey
-
-L935E:
-                inx
-                iny
-                lda errors_table,x
-                sta brkbuf+1,y
-                bne L935E
-                jmp brkbuf
-                .endproc
-                
-;-------------------------------------------------------------------------
-;
-; Find string tail.
-; Entry: ($f2),y = string pointer
-; Exit: C=0 - something on command line, ($f2),y points to it, A=first char
-;       C=1 - nothing on command line, ($f2),y points to end, A=13
-; Preserves: X
-retry_find_string_tail:
-                iny
-find_string_tail:
-                lda ($f2),y     ; read next value from command line
-                cmp #13
-                beq _done       ; taken with C=1 if eol
-                cmp #' '
-                beq retry_find_string_tail ; taken with C=1 if space -
-                                          ; move to next byte and try
-                                          ; again
-                clc
-_done:
-                rts
-
-;-------------------------------------------------------------------------
-;
-; Call found command's command table routine.
-; Entry: X = offset into command table of MSB of command routine
-call_command_table_routine: .proc
-                lda command_table,x
-                pha
-                lda command_table+1,x
-                pha
-                rts
-                .endproc
-
-;-------------------------------------------------------------------------
-; 
-; Try to find command in commands table
-; Entry: ($f2),y = pointer to string
-;        X = offset into command_table
-; Exit: C=0 if command found
-;       X = offset of routine address
-;           (ready for call_command_table_routine)
-find_command: .block
-                .section find_command_workspace
-fc_table_offset: .fill 1
-fc_string_offset: .fill 1
-                .endsection
-                
-                stx fc_table_offset
-                clc
-                jsr find_string_tail; Check if command line tail is empty.
-                                   ; Entry: ($f2),y = command line tail
-                                   ; Exit:  C=0 - something on command line
-                                   ;        C=1 - nothing on command line
-                sty fc_string_offset
-
-L9245:
-                ldy fc_string_offset
-                dex
-                dey
-
-L9249:
-                inx
-                iny
-                lda command_table,x
-                sec
-                beq done        ; taken if end of table reached
-                bmi L9269
-                eor ($F2),y
-                and #$5F
-                beq L9249
-                lda ($F2),y
-                cmp #'.'
-                beq L9271
-
-L925F:
-                inx
-                lda command_table,x
-                bpl L925F       ; taken if end of command name reached
-
-L9265:
-                inx
-                inx
-                inx
-                bne L9245
-
-L9269:
-                lda ($F2),y
-                jsr isalpha     ; Check if char is alphabetic
-                                ; Entry: A = char of interest
-                                ; Exit:  C=0 if alpha, C=1 if not alpha
-                bcc L9265       ; taken if alpha
-                dey
-
-L9271:
-                iny
-                dex
-
-L9273:
-                inx
-                lda command_table,x
-                bpl L9273
-                clc
-
-done:
-                rts
-                .endblock
-
-;-------------------------------------------------------------------------
-
-; Check if char is alphabetic
-; Entry: A = char of interest
-; Exit:  C=0 if alpha, C=1 if not alpha
-
-isalpha:        .block
-                pha             ; store char
-                and #$DF        ; convert lower case to upper case
-                cmp #'A'
-                bcc not_alpha   ; taken if not alpha
-                cmp #'Z'+1
-                bcc done        ; taken if alpha
-
-not_alpha:
-                sec
-
-done:
-                pla             ; restore char
-                rts
-                .endblock
-
-;-------------------------------------------------------------------------
-;
-; Print 0-terminated string following call.
-;
-; Preserves: X
-print_following_string: .proc
-                .section print_following_string_workspace
-pfs_ptr: .fill 2
-                .endsection
-
-loop:
-                ; inc address on stack and store in pfs_ptr
-                clc
-                pla
-                adc #1
-                sta pfs_ptr+0
-                tay
-                pla
-                adc #0
-                sta pfs_ptr+1
-                pha
-                tya
-                pha
-
-                ; fetch next byte from string
-                ldy #0
-                lda (pfs_ptr),y
-                beq done
-                jsr oswrch
-                jmp loop
-
-done:
-                rts
-                
-                .endproc                
-
-;-------------------------------------------------------------------------
-;
 ; Return value indicating whether hardware type is valid.
 ;
 ; Exit: C=1 if valid type:
@@ -2023,8 +1882,6 @@ done:
 ;            V=1 if Master
 ;       C=0 if invalid type
 ; Preserves: A/X/Y
-;-------------------------------------------------------------------------
-
 is_valid_hw: .proc
                 pha
                 txa
@@ -2091,7 +1948,7 @@ read_state: .proc
                 jsr must_be_valid_hw
                 bvs master
 
-read_state_electron:
+electron:
                 stx state_ptr+0
                 ldx elk_state_offsets,y
                 lda $200,x
@@ -2122,6 +1979,7 @@ write_state: .proc
                 jsr must_be_valid_hw
                 bvs master
 
+electron:
                 stx state_ptr+0
                 ldx elk_state_offsets,y
                 sta $200,x
@@ -2144,16 +2002,145 @@ master:
                 .endproc
 
 ;-------------------------------------------------------------------------
+;
+; Restore default BYTEV and KEYV vectors.
+;
+; Preserves: P/A/X/Y
 
-elk_state_offsets: .proc
-                .byte <elk_jflags
-                .byte <elk_up
-                .byte <elk_down
-                .byte <elk_left
-                .byte <elk_right
-                .byte <elk_fire
+reset_default_vectors: .proc
+                .section reset_default_vectors_workspace
+rdv_ptr: .fill 2
+                .endsection
+                
+                php
+                sei
+                tya
+                pha
+
+                lda default_vectors_ptr+0
+                sta rdv_ptr+0
+                lda default_vectors_ptr+1
+                sta rdv_ptr+1
+
+                ldy #<bytev
+                jsr restore_default_vector
+
+                ldy #<keyv
+                jsr restore_default_vector
+
+                pla
+                tay
+                plp
+                rts
+
+restore_default_vector:
+                jsr restore_default_vector_byte
+restore_default_vector_byte:
+                lda (rdv_ptr),y
+                sta $200,y
+                iny
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick: .proc
+                jsr is_valid_hw
+                lda #0
+                bcc done
+                bvc read_joystick_elk
+                bvs read_joystick_master
+done:
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick on Master.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick_master: .proc
+                .cpu '65c02'
+                php
+                sei
+                lda acccon
+                pha
+                lda #acccon.ifj
+                tsb acccon
+                lda joystick_fred_offsets,x
+                tax
+                lda $fc00,x
+                plx
+                stx acccon
+                plp
+                rts
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read joystick on Electron.
+;
+; Entry: X = joystick index, 0-3
+; Exit: A = value read
+; Preserves: Y
+read_joystick_elk:
+                lda joystick_fred_offsets,x
+                tax
+                lda $fc00,x
+                rts
+
+;-------------------------------------------------------------------------
+                .endsection common
+;-------------------------------------------------------------------------
+                .section library
+;-------------------------------------------------------------------------
+; 
+; jmp_default_osbyte
+;
+jmp_default_osbyte: .proc
+                php
+with_p_already_pushed:
+                sei
+                sty os_seia         ;caution
+                ldy #<bytev
+                bne jmp_default_vector_routine
                 .endproc
                 
+jmp_default_keyv: .proc
+                php
+with_p_already_pushed:
+                sei
+                sty os_seia         ;caution
+                ldy #<keyv
+                .cerror *!=jmp_default_vector_routine,'fallthrough broke'
+                .endproc
+jmp_default_vector_routine: .proc
+                pha
+                lda default_vectors_ptr+0
+                sta os_seiwk+0
+                lda default_vectors_ptr+1
+                sta os_seiwk+1
+                lda (os_seiwk),y ;routine LSB
+                pha
+                iny
+                lda (os_seiwk),y ;routine MSB
+                sta os_seiwk+1
+                pla
+                sta os_seiwk+0
+                ldy os_seia
+                pla
+                plp
+                jmp (os_seiwk)
+                .endproc
+
 ;-------------------------------------------------------------------------
 ;
 ; Read 8-bit integer from string.
@@ -2323,160 +2310,6 @@ L9563:
 
 ;-------------------------------------------------------------------------
 ;
-; Restore default BYTEV and KEYV vectors.
-;
-; Preserves: P/A/X/Y
-
-reset_default_vectors: .proc
-                .section reset_default_vectors_workspace
-rdv_ptr: .fill 2
-                .endsection
-                
-                php
-                sei
-                tya
-                pha
-
-                lda default_vectors_ptr+0
-                sta rdv_ptr+0
-                lda default_vectors_ptr+1
-                sta rdv_ptr+1
-
-                ldy #<bytev
-                jsr restore_default_vector
-
-                ldy #<keyv
-                jsr restore_default_vector
-
-                pla
-                tay
-                plp
-                rts
-
-restore_default_vector:
-                jsr restore_default_vector_byte
-restore_default_vector_byte:
-                lda (rdv_ptr),y
-                sta $200,y
-                iny
-                rts
-                .endproc
-
-;-------------------------------------------------------------------------
-;
-; Exit: Stack = [old_ACCCON old_P]
-;       IRQs disabled
-;       (os_seiwk) points to workspace
-; Preserves: A/X/Y
-setup_acccon_master: .proc
-                .cpu '65c02'
-                pha
-                php
-                pha
-                phx
-                tsx
-
-                ;
-                ; | Addr   | Before | After |
-                ; |--------|--------|-------|
-                ; | $101,x | old X  | old X
-                ; | $102,x | old A  | old A
-                ; | $103,x | old P  | retL
-                ; | $104,x | old A  | retH
-                ; | $105,x | retL   | old ACCCON
-                ; | $106.x | retH   | old P
-
-                lda $106,x
-                sta $104,x
-                lda $103,x
-                sta $106,x
-                lda $105,x
-                sta $103,x
-                lda acccon
-                sta $105,x
-
-                sei
-                lda #acccon.ifj|acccon.y
-                tsb acccon
-
-                ldx $f4
-                lda $df0,x
-                sta os_seiwk+1
-                stz os_seiwk+0
-
-                pla
-                plx
-                rts
-                .cpu 'default'
-                .endproc
-
-;-------------------------------------------------------------------------
-;
-; Read joystick.
-;
-; Entry: X = joystick index, 0-3
-; Exit: A = value read
-; Preserves: Y
-read_joystick: .proc
-                jsr is_valid_hw
-                lda #0
-                bcc done
-                bvc read_joystick_elk
-                bvs read_joystick_master
-done:
-                rts
-                .endproc
-
-;-------------------------------------------------------------------------
-;
-; Read joystick on Master.
-;
-; Entry: X = joystick index, 0-3
-; Exit: A = value read
-; Preserves: Y
-read_joystick_master: .proc
-                .cpu '65c02'
-                php
-                sei
-                lda acccon
-                pha
-                lda #acccon.ifj
-                tsb acccon
-                lda joystick_fred_offsets,x
-                tax
-                lda $fc00,x
-                plx
-                stx acccon
-                plp
-                rts
-                .cpu 'default'
-                .endproc
-
-;-------------------------------------------------------------------------
-;
-; Read joystick on Electron.
-;
-; Entry: X = joystick index, 0-3
-; Exit: A = value read
-; Preserves: Y
-read_joystick_elk:
-                lda joystick_fred_offsets,x
-                tax
-                lda $fc00,x
-                rts
-
-joystick_fred_offsets:
-                .byte $c0,$d0,$e0,$f0
-
-joystick_action_masks:
-                .byte %00000001
-                .byte %00000010
-                .byte %00000100
-                .byte %00001000
-                .byte %00010000
-                
-;-------------------------------------------------------------------------
-;
 ; Read a (short - max 5 chars) line
 ;
 ; Exit: $line_input_data = input read
@@ -2525,7 +2358,201 @@ nybble:
                 .endproc
                 
 ;-------------------------------------------------------------------------
+;
+; Call OSBYTE with X=$00 Y=$FF
+;
+osbyte_x00_yff:
+                ldx #0
+osbyte_yff:
+                ldy #$ff
+jmp_osbyte:
+                jmp osbyte
+                
+;-------------------------------------------------------------------------
+; 
+; Try to find command in commands table
+; Entry: ($f2),y = pointer to string
+;        X = offset into command_table
+; Exit: C=0 if command found
+;       X = offset of routine address
+;           (ready for call_command_table_routine)
+find_command: .block
+                .section find_command_workspace
+fc_table_offset: .fill 1
+fc_string_offset: .fill 1
+                .endsection
+                
+                stx fc_table_offset
+                clc
+                jsr find_string_tail; Check if command line tail is empty.
+                                   ; Entry: ($f2),y = command line tail
+                                   ; Exit:  C=0 - something on command line
+                                   ;        C=1 - nothing on command line
+                sty fc_string_offset
 
-                .endsection code
+L9245:
+                ldy fc_string_offset
+                dex
+                dey
 
+L9249:
+                inx
+                iny
+                lda command_table,x
+                sec
+                beq done        ; taken if end of table reached
+                bmi L9269
+                eor ($F2),y
+                and #$5F
+                beq L9249
+                lda ($F2),y
+                cmp #'.'
+                beq L9271
+
+L925F:
+                inx
+                lda command_table,x
+                bpl L925F       ; taken if end of command name reached
+
+L9265:
+                inx
+                inx
+                inx
+                bne L9245
+
+L9269:
+                lda ($F2),y
+                jsr isalpha     ; Check if char is alphabetic
+                                ; Entry: A = char of interest
+                                ; Exit:  C=0 if alpha, C=1 if not alpha
+                bcc L9265       ; taken if alpha
+                dey
+
+L9271:
+                iny
+                dex
+
+L9273:
+                inx
+                lda command_table,x
+                bpl L9273
+                clc
+
+done:
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+
+; Check if char is alphabetic
+; Entry: A = char of interest
+; Exit:  C=0 if alpha, C=1 if not alpha
+
+isalpha:        .block
+                pha             ; store char
+                and #$DF        ; convert lower case to upper case
+                cmp #'A'
+                bcc not_alpha   ; taken if not alpha
+                cmp #'Z'+1
+                bcc done        ; taken if alpha
+
+not_alpha:
+                sec
+
+done:
+                pla             ; restore char
+                rts
+                .endblock
+
+;-------------------------------------------------------------------------
+;
+; Print 0-terminated string following call.
+;
+; Preserves: X
+print_following_string: .proc
+                .section print_following_string_workspace
+pfs_ptr: .fill 2
+                .endsection
+
+loop:
+                ; inc address on stack and store in pfs_ptr
+                clc
+                pla
+                adc #1
+                sta pfs_ptr+0
+                tay
+                pla
+                adc #0
+                sta pfs_ptr+1
+                pha
+                tya
+                pha
+
+                ; fetch next byte from string
+                ldy #0
+                lda (pfs_ptr),y
+                beq done
+                jsr oswrch
+                jmp loop
+
+done:
+                rts
+                
+                .endproc                
+
+;-------------------------------------------------------------------------
+;
+; Cause an error.
+;
+; Entry: X = offset of error data in errors_table
+do_error: .proc
+                ldy #0
+                sty brkbuf
+                dex
+                dey
+
+L935E:
+                inx
+                iny
+                lda errors_table,x
+                sta brkbuf+1,y
+                bne L935E
+                jmp brkbuf
+                .endproc
+                
+;-------------------------------------------------------------------------
+;
+; Find string tail.
+; Entry: ($f2),y = string pointer
+; Exit: C=0 - something on command line, ($f2),y points to it, A=first char
+;       C=1 - nothing on command line, ($f2),y points to end, A=13
+; Preserves: X
+retry_find_string_tail:
+                iny
+find_string_tail:
+                lda ($f2),y     ; read next value from command line
+                cmp #13
+                beq _done       ; taken with C=1 if eol
+                cmp #' '
+                beq retry_find_string_tail ; taken with C=1 if space -
+                                          ; move to next byte and try
+                                          ; again
+                clc
+_done:
+                rts
+
+;-------------------------------------------------------------------------
+;
+; Call found command's command table routine.
+; Entry: X = offset into command table of MSB of command routine
+call_command_table_routine: .proc
+                lda command_table,x
+                pha
+                lda command_table+1,x
+                pha
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+                .endsection library
 ;-------------------------------------------------------------------------
