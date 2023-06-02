@@ -420,13 +420,6 @@ elk_state_offsets: .proc
 joystick_fred_offsets:
                 .byte $c0,$d0,$e0,$f0
 
-joystick_action_masks:
-                .byte %00000001
-                .byte %00000010
-                .byte %00000100
-                .byte %00001000
-                .byte %00010000
-                
 ;-------------------------------------------------------------------------
                 .endsection tables
 ;-------------------------------------------------------------------------
@@ -1498,7 +1491,7 @@ loop:
                 cmp (os_seiwk),y
                 bne next        ;taken if not this jkey
                 txa             ;get joystick flags
-                and joystick_action_masks-State.action_keys,y
+                and joystick_actions.masks-State.action_keys,y
                 bne pressed     ;taken if this jkey pressed
 next:
                 dey
@@ -1566,7 +1559,7 @@ scan_multiple_keys: .block
                 ldy #State.action_keys+num_actions-1
 loop:
                 txa             ;A=joystick flags
-                and joystick_action_masks-State.action_keys,y
+                and joystick_actions.masks-State.action_keys,y
                 beq next        ;taken if not pressed
 
                 lda (os_seiwk),y ;get key for this action
