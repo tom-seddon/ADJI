@@ -18,7 +18,7 @@ os_y=$f1 ; Y value for osbyte/osword
 os_seiwk=$fa
 
 ; only safe to use with IRQs disabled!
-; os_seia=$fc
+os_seia=$fc
 
 ; Fortunately the same on Electron OS 1.00 and Master MOS.
 os_auto_repeat_countdown=$e7
@@ -700,27 +700,6 @@ keyv_done:
                 
 ;-------------------------------------------------------------------------
 ;
-; Handle OSBYTE on Master 128 when called via extended vector.
-;
-; Entry: A/X/Y = as per OSBYTE
-; 
-handle_osbyte_xvector_master: .proc
-                .cpu '65c02'
-                php
-                sei
-                sta os_a
-                stx os_x
-                sty os_y
-                ldx $f4
-                lda $df0,x
-                sta os_seiwk+1
-                stz os_seiwk+0
-                jmp handle_osbyte_master
-                .cpu 'default'
-                .endproc
-
-;-------------------------------------------------------------------------
-;
 ; OSBYTE/KEYV overlay routine for Master 128.
 ;
 ; Entry: A/X/Y/P as per OSBYTE or KEYV (according to entry point)
@@ -738,7 +717,7 @@ rom_offset=*+1-overlay_master
                 sta $fe30
 workspace_page=*+1-overlay_master
                 lda #$ff
-                jmp handle_osbyte_overlay_master
+                jmp handle_overlay_master
                 .endblock
 
                 ; Unlikely
@@ -750,36 +729,44 @@ workspace_page=*+1-overlay_master
 ;
 ; Entry: A = workspace address MSB
 ;        X/Y = as per OSBYTE
+;        IRQs disabled
 ;        Stack = [A, P, OSBYTE ret]
 ; 
-handle_osbyte_overlay_master:
-                ; Store workspace address in SEIWK.
+handle_overlay_master:
+                ; Store workspace address MSB.
                 sta os_seiwk+1
-                stz os_seiwk+0
 
-                ; Store input registers in zero page.
-                pla             ;restore input A
-                sta os_a
-                stx os_x
-                sty os_y
+                ; Save input A.
+                pla
+                sta os_seiwk+0
 
-                plx             ;restore input P
+                ; Save input P.
+                pla
+                sta os_seia
 
-                ; Save ROMSEL
+                ; Save previous ROMSEL.
                 lda $f4
                 pha
                 
-                ; Make ROMSEL and $f4 consistent
+                ; Make ROMSEL and $f4 consistent.
                 lda $fe30
                 sta $f4
 
-                ; Insert overlay exit routine addres
+                ; Insert overlay exit routine addres.
                 lda #>handle_overlay_exit_master-1
                 pha
                 lda #<handle_overlay_exit_master-1
                 pha
 
-                phx             ;Save input P
+                ; Put input P back on stack.
+                lda os_seia
+                pha
+
+                ; Reinstate input A.
+                lda os_seiwk+0
+
+                ; Form workspace address in (os_seiwk).
+                stz os_seiwk+0
 
                 jmp handle_osbyte_master
 
@@ -804,6 +791,28 @@ handle_overlay_exit_master:
 
 ;-------------------------------------------------------------------------
 ;
+; Handle OSBYTE on Master 128 when called via extended vector.
+;
+; Entry: A/X/Y = as per OSBYTE
+; 
+handle_osbyte_xvector_master: .proc
+                .cpu '65c02'
+                php
+                sei
+                pha
+                phx
+                ldx $f4
+                lda $df0,x
+                sta os_seiwk+1
+                stz os_seiwk+0
+                plx
+                pla
+                jmp handle_osbyte_master
+                .cpu 'default'
+                .endproc
+
+;-------------------------------------------------------------------------
+;
 ; KEYV xvector handler for Master 128
 ;
 ; Entry: just as per KEYV
@@ -811,13 +820,14 @@ handle_keyv_xvector_master: .proc
                 .cpu '65c02'
                 php
                 sei
-                sta os_a
-                stx os_x
-                sty os_y
+                pha
+                phx
                 ldx $f4
                 lda $df0,x
                 sta os_seiwk+1
                 stz os_seiwk+0
+                plx
+                pla
                 jmp keyv_master
                 .cpu 'default'                
                 .endproc
@@ -826,16 +836,21 @@ handle_keyv_xvector_master: .proc
 ;
 ; OSBYTE/KEYV handler for Master 128
 ; 
-; Entry: ?os_a, ?os_x, ?os_y = OSBYTE/KEYV entry arguments
+; Entry: A, X, Y = OSBYTE/KEYV entry arguments
 ;        (os_seiwk) = pointer to workspace in HAZEL
 ;        IRQs disabled
 ;        Stack: [Input P; appropriate return address]
 
 handle_osbyte_master:
-                lda os_a
-
+                ; Don't use the OSBYTE zero page yet - it might be
+                ; KEYV, possibly called from an interrupt context.
                 cmp #keyv_osbyte
                 beq keyv_master
+
+                ; This is OSBYTE.
+                sta os_a
+                stx os_x
+                sty os_y
 
                 cmp #$80
                 beq osbyte_80_master
@@ -994,8 +1009,8 @@ try_osbyte:
                 cpy #$ff
                 bne kkey_pressed
 
-                lda #1
-                sta os_auto_repeat_countdown
+                ; lda #1
+                ; sta os_auto_repeat_countdown
 
                 ; Restore state.
                 pla             ;Restore workspcae ptr MSB [X Y P RL RH]
@@ -1025,7 +1040,6 @@ kkey_pressed:
                 pla             ;discard counter LSB [Y P RL RH]
                 pla             ;discard counter MSB [P RL RH]
                 plp             ;restore IRQ state [RL RH]
-                dey             ;Y=0
                 lda #$81        ;A is preserved
                 clc
                 rts
@@ -1063,6 +1077,7 @@ reset_auto_repeat_countdown:
                 pla             ;discard counter MSB [P RL RH]
                 plp             ;restore old IRQ state [RL RH]
                 lda os_a
+                ldy #0
                 clc
                 rts
                 
@@ -1138,7 +1153,7 @@ default:
 ; KEYV handler for Master 128.
 ;
 ; Entry: A = keyv_osbyte
-;        ?os_x, ?os_y = KEYV arguments
+;        X, Y = KEYV arguments
 ;        (os_seiwk) = pointer to workspace in HAZEL
 ;        IRQs disabled
 ;        Stack: [Input P; appropriate return address]
@@ -1151,13 +1166,14 @@ keyv_master: .proc
                 beq scan
 
                 ; Forward to default KEYV.
-                ldx os_x
-                ldy os_y
                 jmp jmp_default_keyv.with_p_already_pushed
 
 scan:
+                sta os_a
+                sty os_y
+                
                 ; Check for keyboard scan mode.
-                lda os_x
+                txa
                 bpl scan_multiple_keys ;taken if scanning for multiple
                                        ;keys
 
@@ -1221,13 +1237,11 @@ pressed:
                 .endblock
                 
 scan_multiple_keys: .block
-                lda os_x
-                pha
+                phx
                 lda os_seiwk+1
                 pha
                 sec
                 clv
-                ldx os_x
                 jsr jmp_default_keyv
 
                 ; Save KEYV result.
@@ -1341,39 +1355,38 @@ max_value_masks: .byte jleft_mask,jdown_mask,0,0
 ;
 jmp_default_osbyte: .proc
                 php
-                sei
 with_p_already_pushed:
-                pha
-                sty os_y
+                sei
+                sty os_seia         ;caution
                 ldy #<bytev
                 bne jmp_default_vector_routine
                 .endproc
                 
 jmp_default_keyv: .proc
                 php
-                sei
 with_p_already_pushed:
-                pha
-                sty os_y
+                sei
+                sty os_seia         ;caution
                 ldy #<keyv
                 .cerror *!=jmp_default_vector_routine,'fallthrough broke'
                 .endproc
 jmp_default_vector_routine: .proc
+                pha
                 lda default_vectors_ptr+0
-                sta os_a
+                sta os_seiwk+0
                 lda default_vectors_ptr+1
-                sta os_x
-                lda (os_a),y    ;get LSB of routine
+                sta os_seiwk+1
+                lda (os_seiwk),y ;routine LSB
                 pha
                 iny
-                lda (os_a),y    ;get MSB of routine
-                sta os_x        ;store MSB of routine
-                pla             ;restore LSB of routine
-                sta os_a        ;store LSB of routine
-                ldy os_y        ;restore input Y
-                pla             ;restore input A
-                plp             ;restore input P
-                jmp (os_a)      ;call routine
+                lda (os_seiwk),y ;routine MSB
+                sta os_seiwk+1
+                pla
+                sta os_seiwk+0
+                ldy os_seia
+                pla
+                plp
+                jmp (os_seiwk)
                 .endproc
 
 ;-------------------------------------------------------------------------
