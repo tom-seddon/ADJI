@@ -1735,32 +1735,6 @@ print:
 
 ;-------------------------------------------------------------------------
 ;
-; Switch cursor on (con) or off (coff)
-; 
-con:
-                ldx #con_vdu-cset_vdu
-                jmp cset
-coff:
-                ldx #coff_vdu-cset_vdu
-cset:
-                ldy #10
-cset_loop:
-                lda cset_vdu,x
-                jsr oswrch
-                inx
-                dey
-                bne cset_loop
-                rts
-                
-cset_vdu:
-con_vdu:
-                .byte 23,1,1
-coff_vdu:
-                .byte 23,1,0
-                ; doens't matter what comes next...
-                
-;-------------------------------------------------------------------------
-;
 ; Parse <no> argument from command line. Does a BRK for invalid
 ; joystick numbers.
 ;
@@ -2553,6 +2527,32 @@ call_command_table_routine: .proc
                 rts
                 .endproc
 
+;-------------------------------------------------------------------------
+;
+; Switch cursor on (con) or off (coff)
+; 
+con:
+                ldx #con_vdu-cset_vdu
+                jmp cset
+coff:
+                ldx #coff_vdu-cset_vdu
+cset:
+                ldy #10
+cset_loop:
+                lda cset_vdu,x
+                jsr oswrch
+                inx
+                dey
+                bne cset_loop
+                rts
+                
+cset_vdu:
+con_vdu:
+                .byte 23,1,1
+coff_vdu:
+                .byte 23,1,0
+                ; doens't matter what comes next...
+                
 ;-------------------------------------------------------------------------
                 .endsection library
 ;-------------------------------------------------------------------------
