@@ -29,9 +29,6 @@ os_auto_repeat_period=$255
 os_restore_rom_master=$ffa4
 os_restore_rom_electron=$ff9c
 
-line_input_pblock=$150
-line_input_data=$155
-
 ;-------------------------------------------------------------------------
 
 ; MOS variables
@@ -155,6 +152,7 @@ struct_section: .macro
                 .struct_section cmd_jjoy_workspace
                 .struct_section cmd_jkeys_workspace
                 .struct_section cmd_jksetup_workspace
+                .struct_section cmd_jsetup_workspace
                 .endunion
                 
                 .cerror *>$b0,'zp overflow'
@@ -165,17 +163,20 @@ struct_section: .macro
                 ; Leaf routines that only use transient zp workspace
                 ; and make no FS calls (or can survive their workspace
                 ; being zapped if one is made).
-                ;
-                ; This region isn't a union, as space here is a bit
-                ; less tight than in $a8...$af.
+
+                ; Leaf functions
+                .union
                 .struct_section print_following_string_workspace
-                .struct_section find_command_workspace
-                .struct_section reset_default_vectors_workspace
                 .struct_section install_xvector_workspace
+                .struct_section reset_default_vectors_workspace
                 .struct_section read_or_write_state_workspace
+                .endunion
+                
+                .struct_section find_command_workspace
                 .struct_section set_jkeys_mode_workspace
                 .struct_section print_joystick_action_name_workspace
                 .struct_section verbose_get_key_workspace
+                .struct_section question_workspace
                 .cerror *>$c0,'FS scratch zp overflow'
 
 ;-------------------------------------------------------------------------
@@ -241,6 +242,7 @@ cmds_offset=*-command_table
                 .command_table_entry "JOFF",cmd_joff,help_table.none_offset
                 .command_table_entry "JKEYS",cmd_jkeys,help_table.jkeys_offset
                 .command_table_entry "JKSETUP",cmd_jksetup,help_table.jksetup_offset
+                .command_table_entry "JSETUP",cmd_jsetup,help_table.none_offset
                 .if debug
                 .command_table_entry "JSTATE",cmd_jstate,help_table.none_offset
                 .endif
@@ -316,6 +318,20 @@ elk_state_offsets: .proc
 joystick_fred_offsets:
                 .byte $c0,$d0,$e0,$f0
 
+;-------------------------------------------------------------------------
+
+questions_table: .proc
+jno=*-questions_table
+                .shiftl "Joystick no"
+                .shiftl "1/2/3/4"
+jk=*-questions_table
+                .shiftl "Joystick/Keys"
+                .shiftl "J/K"
+xo=*-questions_table
+                .shiftl "Xvector/Overlay"
+                .shiftl "X/O"
+                .endproc
+                
 ;-------------------------------------------------------------------------
                 .endsection tables
 ;-------------------------------------------------------------------------
@@ -651,7 +667,181 @@ print_tail_done:
                 ldy yval
                 jmp handle_install_mode
                 .endproc
+
+;-------------------------------------------------------------------------
+
+cmd_jsetup: .proc
+input_block=$150
+input_buffer=$155
+                .section cmd_jsetup_workspace
+jno: .fill 1
+jmode: .fill 1
+use_overlay: .fill 1
+action_index: .fill 1
+                .endsection
+
+                jsr reset_default_vectors
+
+                ldx #questions_table.jno
+                jsr question
+                bcs done
+                sty jno
+
+                ldx #questions_table.jk
+                jsr question
+                bcs done
+                sty jmode
+
+                ldx #questions_table.xo
+                jsr question
+                bcs done
+                sty use_overlay
+                cpy #0
+                beq got_hook_details ;taken if xvector
+
+                jsr print_following_string
+                .text 'Overlay addr (default: &',format('%X',default_overlay_address),'): ',0
+
+                ; seems to be usual to put the parameter block in main
+                ; RAM, rather than referring to one in the ROM?
+                ldy #4
+-
+                lda osword_block,y
+                sta input_block,y
+                dey
+                bpl -
+
+                ldx #<input_block
+                ldy #>input_block
+                lda #0
+                jsr osword
+                bcs done
+
+                lda #<default_overlay_address
+                sta strtoi_value+0
+                lda #>default_overlay_address
+                sta strtoi_value+1
                 
+                lda #<input_buffer
+                sta $f2
+                lda #>input_buffer
+                sta $f3
+                ldy #0
+                jsr find_string_tail
+                bcs got_hook_details ;taken if empty input - use
+                                     ;default
+                
+                jsr strtoi
+got_hook_details:
+                
+                lda jmode
+                bne keys         ;taken if keys
+
+joy:
+                jsr print_following_string
+                .text '*JKEYS ',0
+
+                jsr print_jno
+                jsr print_hook_info
+                rts
+
+keys:
+                lda #0
+                sta action_index
+actions_loop:
+                jsr print_following_string
+                .text 'Press ',0
+
+                ldx action_index
+                jsr print_joystick_action_name
+
+                jsr print_following_string
+                .text ': ',0
+
+                jsr verbose_get_key
+
+                jsr osnewl
+
+                clc
+                lda action_index
+                adc #State.action_keys
+                tay             ;Y=state offset
+
+                txa             ;A=INKEY
+                eor #$ff        ;A=internal key value
+                jsr write_state
+
+                inc action_index
+                lda action_index
+                cmp #num_actions
+                bne actions_loop
+
+                ; Clear buffers
+                lda #15
+                ldx #0
+                jsr osbyte
+
+                ; Print *JKEYS command line
+                jsr print_following_string
+                .text '*JKEYS ',0
+
+                jsr print_jno
+
+                lda jno
+                clc
+                adc #'1'
+                jsr oswrch
+
+                ldx #State.action_keys
+print_keys_loop:
+                jsr print_following_string
+                .text ' &',0
+
+                txa
+                tay
+                jsr read_state
+                eor #$ff        ;convert to negative INKEY value
+                jsr print_hex_byte
+
+                inx
+                cpx #State.action_keys+num_actions
+                bne print_keys_loop
+
+                jsr print_hook_info
+done:
+                rts
+
+print_jno:
+                lda jno
+                clc
+                adc #'1'
+                jmp oswrch
+
+print_hook_info:
+                lda #' '
+                jsr oswrch
+                lda use_overlay
+                bne print_overlay_addr
+                ; using xvector
+                lda #'X'
+                jsr oswrch
+                jmp osnewl
+print_overlay_addr:
+                lda #'&'
+                jsr oswrch
+                lda strtoi_value+1
+                jsr print_hex_byte
+                lda strtoi_value+0
+                jsr print_hex_byte
+                jmp osnewl
+
+osword_block:
+                .word input_buffer ;buffer address
+                .byte 5            ;max length
+                .byte 32           ;min ASCII
+                .byte 127          ;max ASCII
+                
+                .endproc
 ;-------------------------------------------------------------------------
 
 cmd_jtest: .proc
@@ -1534,6 +1724,97 @@ setup_acccon_master: .proc
                 .section common
 ;-------------------------------------------------------------------------
 ;
+; Entry: X = offset into questions table
+; Exit: Y = index of option
+;       C=1 if Escape pressed
+question: .proc
+                .section question_workspace
+char_entered: .fill 1
+                .endsection
+
+                jsr print_string ;question
+
+                txa
+                pha             ;save options offset
+                
+                jsr print_following_string
+                .text ' (',0
+
+                jsr print_string ;options
+
+                jsr print_following_string
+                .text ')? ',0
+
+read_option_loop:
+                jsr osrdch
+                bcs quit
+                
+                jsr toupper
+                sta char_entered
+
+                ; Y = option index
+                ldy #0
+
+                ; X = option offset
+                pla
+                pha
+                tax
+find_option_loop:
+                lda questions_table,x
+                lsr a
+                php
+                
+                ; Cheaper to include the '/' in the option string, but
+                ; now it does have to be excluded.
+                cmp #'/'
+                beq next
+                
+                cmp char_entered
+                beq found
+
+                iny
+next:
+                inx
+                plp
+                bcc find_option_loop
+                bcs read_option_loop
+
+found:
+                jsr oswrch
+                jsr osnewl
+                pla             ;discard saved P
+                clc             ;indicate Escape not pressed
+quit:
+                pla             ;discard saved options offset
+                rts
+
+print_string:
+                lda questions_table,x
+                jsr shiftl_oswrch
+                inx
+                bcc print_string
+                rts
+                
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Call OSWRCH with a .shiftl char.
+;
+; Entry: A = shiftl char
+; Exit: A = ASCII value
+;       C=1 if it was the terminator
+; Preserves: X/Y
+shiftl_oswrch: .proc
+                lsr a
+                php
+                jsr oswrch
+                plp
+                rts
+                .endproc
+                
+;-------------------------------------------------------------------------
+;
 ; Handle OSBYTE $80, X<=4
 ;
 ; Entry: ?os_a = value read from joystick
@@ -2159,29 +2440,6 @@ L9563:
 
 ;-------------------------------------------------------------------------
 ;
-; Read a (short - max 5 chars) line
-;
-; Exit: $line_input_data = input read
-; 
-read_line: .proc
-                lda #<line_input_data
-                sta line_input_pblock+0
-                lda #>line_input_data
-                sta line_input_pblock+1
-                lda #5
-                sta line_input_pblock+2
-                lda #32
-                sta line_input_pblock+3
-                lda #127
-                sta line_input_pblock+4
-                ldx #<line_input_pblock
-                ldy #>line_input_pblock
-                lda #0
-                jmp osword
-                .endproc
-
-;-------------------------------------------------------------------------
-;
 ;
 print_hex_byte: .proc
                 pha
@@ -2300,8 +2558,8 @@ toupper: .proc
                 bcc +
                 cmp #'z'+1
                 bcs +
-+
                 and #$df
++
                 rts
                 .endproc
                 
