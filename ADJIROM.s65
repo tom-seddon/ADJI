@@ -142,7 +142,6 @@ struct_section: .macro
 *=$a8
                 ; Leaf routines that only use transient zp workspace
                 .union
-                .struct_section verbose_get_key_workspace
                 .endunion
 
                 ; Leaf routines that return a result in zero page
@@ -176,6 +175,7 @@ struct_section: .macro
                 .struct_section read_or_write_state_workspace
                 .struct_section set_jkeys_mode_workspace
                 .struct_section print_joystick_action_name_workspace
+                .struct_section verbose_get_key_workspace
                 .cerror *>$c0,'FS scratch zp overflow'
 
 ;-------------------------------------------------------------------------
@@ -285,111 +285,7 @@ electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
                 
 ;-------------------------------------------------------------------------
 
-key_table_entry: .macro ascii,name,key_number
-                .cerror (\key_number&$80)!=0,'oops'
-                .byte \ascii
-                .text \name
-                .byte \key_number|$80
-                .endmacro
-
-keys_table:
-                ; BBC/Electron keys
-                .key_table_entry 'A','A',key_a
-                .key_table_entry 'B','B',key_b
-                .key_table_entry 'C','C',key_c
-                .key_table_entry 'D','D',key_d
-                .key_table_entry 'E','E',key_e
-                .key_table_entry 'F','F',key_f
-                .key_table_entry 'G','G',key_g
-                .key_table_entry 'H','H',key_h
-                .key_table_entry 'I','I',key_i
-                .key_table_entry 'J','J',key_j
-                .key_table_entry 'K','K',key_k
-                .key_table_entry 'L','L',key_l
-                .key_table_entry 'M','M',key_m
-                .key_table_entry 'N','N',key_n
-                .key_table_entry 'O','O',key_o
-                .key_table_entry 'P','P',key_p
-                .key_table_entry 'Q','Q',key_q
-                .key_table_entry 'R','R',key_r
-                .key_table_entry 'S','S',key_s
-                .key_table_entry 'T','T',key_t
-                .key_table_entry 'U','U',key_u
-                .key_table_entry 'V','V',key_v
-                .key_table_entry 'W','W',key_w
-                .key_table_entry 'X','X',key_x
-                .key_table_entry 'Y','Y',key_y
-                .key_table_entry 'Z','Z',key_z
-                .key_table_entry '0','0',key_0
-                .key_table_entry '1','1',key_1
-                .key_table_entry '2','2',key_2
-                .key_table_entry '3','3',key_3
-                .key_table_entry '4','4',key_4
-                .key_table_entry '5','5',key_5
-                .key_table_entry '6','6',key_6
-                .key_table_entry '7','7',key_7
-                .key_table_entry '8','8',key_8
-                .key_table_entry '9','9',key_9
-                .key_table_entry '-','-',key_minus
-                .key_table_entry ';',';',key_semicolon
-                .key_table_entry ':',':',key_colon
-                .key_table_entry ',',',',key_comma
-                .key_table_entry '.','.',key_stop
-                .key_table_entry '/','/',key_slash
-                .key_table_entry ' ',"SPACE",key_space
-                .key_table_entry $1B,"ESCAPE",key_escape
-                .key_table_entry $7F,"DELETE",key_delete
-                .key_table_entry $D,"RETURN",key_return
-                .key_table_entry $8B,"CURSOR UP",key_up
-                .key_table_entry $8A,"CURSOR DOWN",key_down
-                .key_table_entry $88,"CURSOR LEFT",key_left
-                .key_table_entry $89,"CURSOR RIGHT",key_right
-                .key_table_entry $87,"COPY",key_copy
-                .key_table_entry 1,"SHIFT",key_shift
-                .key_table_entry 2,"CTRL",key_ctrl
-                .key_table_entry 3,"CAPS LOCK",key_caps_lock
-                
-                ; BBC keys
-                .key_table_entry '@','@',key_at
-                .key_table_entry '[','[',key_left_square_bracket
-                .key_table_entry '\\','\\',key_backslash
-                .key_table_entry ']',']',key_right_square_bracket
-                .key_table_entry '^','^',key_caret
-                .key_table_entry '_','_',key_underline
-                .key_table_entry 9,"TAB",key_tab
-                .key_table_entry 4,"SHIFT LOCK",key_shift_lock
-                .key_table_entry $80,"f0",key_f0
-                .key_table_entry $81,"f1",key_f1
-                .key_table_entry $82,"f2",key_f2
-                .key_table_entry $83,"f3",key_f3
-                .key_table_entry $84,"f4",key_f4
-                .key_table_entry $85,"f5",key_f5
-                .key_table_entry $86,"f6",key_f6
-                .key_table_entry $87,"f7",key_f7
-                .key_table_entry $88,"f8",key_f8
-                .key_table_entry $89,"f9",key_f9
-                
-                ; Master 128 keys
-                .key_table_entry '0','NUM 0',$6a
-                .key_table_entry '1','NUM 1',$6b
-                .key_table_entry '2','NUM 2',$7c
-                .key_table_entry '3','NUM 3',$6c
-                .key_table_entry '4','NUM 4',$7a
-                .key_table_entry '5','NUM 5',$7b
-                .key_table_entry '6','NUM 6',$1a
-                .key_table_entry '7','NUM 7',$1b
-                .key_table_entry '8','NUM 8',$2a
-                .key_table_entry '9','NUM 9',$2b
-                .key_table_entry '+','NUM +',key_numpad_plus
-                .key_table_entry '-','NUM -',key_numpad_minus
-                .key_table_entry '/','NUM /',key_numpad_divide
-                .key_table_entry '#','NUM #',key_numpad_hash
-                .key_table_entry '*','NUM *',key_numpad_multiply
-                .key_table_entry ',','NUM ,',key_numpad_comma
-                .key_table_entry $d,'NUM RETURN',key_numpad_return
-                .key_table_entry $7f,'NUM DELETE',key_numpad_delete
-                .key_table_entry '.','NUM .',key_numpad_stop
-                .text 0
+                .include "build/generated_key_tables.s65"
 
 ;-------------------------------------------------------------------------
 
@@ -1762,7 +1658,7 @@ parse_jno: .proc
 ; Exit: X = INKEY value of key pressed
 verbose_get_key: .proc
                 .section verbose_get_key_workspace
-keys_table_ptr: .fill 2
+kindex: .fill 1
 
 ; if bit 7 set, waiting for no keys pressed. So 
 waiting_for_no_keys: .fill 1
@@ -1771,47 +1667,29 @@ waiting_for_no_keys: .fill 1
                 sec
 main_loop:
                 ror waiting_for_no_keys
-                
-                lda #<keys_table
-                sta keys_table_ptr+0
-                lda #>keys_table
-                sta keys_table_ptr+1
 
+                lda #num_keys-1
+                sta kindex
 keys_loop:
-                ldy #0
-                lda (keys_table_ptr),y ;check for terminator
+                ldx kindex
+                lda key_inkey_numbers_table,x
+                pha             ;save INKEY number
+                ora #$80        ;form true INKEY number
+                tax
+                lda #$81
+                jsr osbyte_yff
+                pla             ;restore INKEY number
+                cpx #$ff        ;C=1 if pressed
+                beq pressed     ;taken if pressed
+
+                dec kindex
+                bpl keys_loop
 
                 ; The end of the table is only reached if no keys
-                ; pressed. So, should this be the end, arrange for
-                ; waiting_for_no_keys to get reset.
+                ; pressed. So arrange for waiting_for_no_keys to get
+                ; reset when repeating.
                 clc
-                beq main_loop
-                iny             ;skip ASCII
-find_name_end_loop:
-                lda (keys_table_ptr),y
-                clc             ;if eot, clear waiting_for_no_keys flag next
-                                ;time
-                beq main_loop
-                bmi found_name_end
-                iny
-                bne find_name_end_loop
-found_name_end:
-                tya
-                pha             ;save offset of key number
-
-                jsr poll_key
-                tax             ;X=INKEY value
-
-                pla             ;restore offset of key number
-                bcs pressed     ;taken if key was pressed
-                
-                sec             ;+1 to get to next key's struct
-                adc keys_table_ptr+0
-                sta keys_table_ptr+0
-                bcc keys_loop
-                inc keys_table_ptr+1
-+
-                jmp keys_loop
+                bcc main_loop
 
 pressed:
                 ; If still waiting for no keys, go right back to the
@@ -1819,34 +1697,29 @@ pressed:
                 bit waiting_for_no_keys
                 bmi verbose_get_key
 
-                ldy #1
-print_name_loop:
-                lda (keys_table_ptr),y
-                bmi printed_name
-                jsr oswrch
-                iny
-                bne print_name_loop
-printed_name:
-                rts
+                cmp #$80        ;C=1 if name is string table offset
+                ora #$80        ;form true INKEY number
+                tax             ;X=INKEY number
 
-; poll for key
-;
-; Entry: (keys_table_ptr) = entry in table
-;        A = offset from keys_table_ptr of (INKEY value)^0x7f
-; Exit: A = INKEY value
-;       C=1 if key down, C=0 if key up
-poll_key:
+                ldy kindex
+                lda key_names_table,y
+                bcs string_name
+
+                ; Name is 1 char
+                jmp oswrch
+
+string_name:
+                ; Name is multiple chars
                 tay
-                lda (keys_table_ptr),y
-                eor #$7f
-                pha
-                tax
-                lda #$81
-                jsr osbyte_yff
-                cpx #$ff
-                pla
+string_name_loop:
+                lda key_strings_table,y
+                lsr a
+                php
+                jsr oswrch
+                plp
+                iny
+                bcc string_name_loop
                 rts
-                
                 .endproc
                 
 ;-------------------------------------------------------------------------
