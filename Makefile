@@ -47,3 +47,13 @@ build:
 clean:
 	$(_V)$(SHELLCMD) rm-tree "$(BUILD)"
 	$(_V)$(SHELLCMD) rm-tree "$(BEEB_BUILD)"
+
+##########################################################################
+##########################################################################
+
+.PHONY:rel
+rel:
+	$(_V)echo Checking for unmodified working copy.
+	$(_V)git diff-index --quiet --cached HEAD --
+	$(_V)git diff-files --quiet
+	$(_V)$(MAKE) build
