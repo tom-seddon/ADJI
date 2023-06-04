@@ -167,14 +167,14 @@ struct_section: .macro
                 ; Leaf functions
                 .union
                 .struct_section print_following_string_workspace
-                .struct_section install_xvector_workspace
                 .struct_section reset_default_vectors_workspace
                 .struct_section read_or_write_state_workspace
+                .struct_section find_command_workspace
+                .struct_section print_joystick_action_name_workspace
                 .endunion
                 
-                .struct_section find_command_workspace
+                .struct_section install_xvector_workspace
                 .struct_section set_jkeys_mode_workspace
-                .struct_section print_joystick_action_name_workspace
                 .struct_section verbose_get_key_workspace
                 .struct_section question_workspace
                 .cerror *>$c0,'FS scratch zp overflow'
@@ -508,13 +508,10 @@ yval: .fill 1
                 sta joystick_index
 
                 sty yval
-                
-                ldy #State.jflags
-                jsr read_state
-                and #~(State.jflags.jindex_mask|State.jflags.jkeys_mask|State.jflags.jjoy_mask)
+
+                lda joystick_index
                 ora #State.jflags.jjoy_mask
-                ora joystick_index
-                jsr write_state
+                jsr set_jflags
                 
                 ldy yval
                 .fall_through_to handle_install_mode
@@ -547,7 +544,8 @@ state_index: .fill 1
                 jsr parse_jno
                 sty yval
 
-                jsr set_jkeys_mode
+                ora #State.jflags.jkeys_mask
+                jsr set_jflags
 
                 lda #State.action_keys
                 sta index
@@ -588,7 +586,8 @@ addr: .fill 1
                 pha
                 sty yval
 
-                jsr set_jkeys_mode
+                ora #State.jflags.jkeys_mask
+                jsr set_jflags
 
                 lda #0
                 sta action_index
@@ -675,7 +674,7 @@ input_block=$150
 input_buffer=$155
                 .section cmd_jsetup_workspace
 jno: .fill 1
-jmode: .fill 1
+jkeys: .fill 1
 use_overlay: .fill 1
 action_index: .fill 1
                 .endsection
@@ -690,7 +689,7 @@ action_index: .fill 1
                 ldx #questions_table.jk
                 jsr question
                 bcs done
-                sty jmode
+                sty jkeys
 
                 ldx #questions_table.xo
                 jsr question
@@ -734,7 +733,7 @@ action_index: .fill 1
                 jsr strtoi
 got_hook_details:
                 
-                lda jmode
+                lda jkeys
                 bne keys         ;taken if keys
 
 joy:
@@ -743,7 +742,19 @@ joy:
 
                 jsr print_jno
                 jsr print_hook_info
-                rts
+install:
+                lda jno
+                ora #State.jflags.jjoy_mask ;assume joystick mode
+                ldx jkeys
+                beq +           ;taken if joystick mode
+
+                ; clear jjoy flag, set jkeys flag
+                eor #State.jflags.jjoy_mask|State.jflags.jkeys_mask
++
+                jsr set_jflags
+                lda use_overlay
+                beq install_xvector
+                jmp install_overlay
 
 keys:
                 lda #0
@@ -785,8 +796,6 @@ actions_loop:
                 jsr print_following_string
                 .text '*JKEYS ',0
 
-                jsr print_jno
-
                 lda jno
                 clc
                 adc #'1'
@@ -808,6 +817,8 @@ print_keys_loop:
                 bne print_keys_loop
 
                 jsr print_hook_info
+                jmp install
+                
 done:
                 rts
 
@@ -1867,20 +1878,19 @@ max_value_masks: .byte jleft_mask,jdown_mask,0,0
 
 ;-------------------------------------------------------------------------
 ;
-; Adjusts jflags: jkeys set, jjoy clear, jindex set.
+; Sets jflags bits: jkeys set, jjoy clear, jindex set.
 ;
-; Entry: A = jindex
+; Entry: A = new values for jindex, jkeys, jjoy
 ; Preserves: X
-set_jkeys_mode: .proc
+set_jflags: .proc
                 .section set_jkeys_mode_workspace
-index: .fill 1
+set_bits: .fill 1
                 .endsection
-                sta index
+                sta set_bits
                 ldy #State.jflags
                 jsr read_state
                 and #~(State.jflags.jindex_mask|State.jflags.jkeys_mask|State.jflags.jjoy_mask)
-                ora #State.jflags.jkeys_mask
-                ora index
+                ora set_bits
                 jmp write_state
                 .endproc
                

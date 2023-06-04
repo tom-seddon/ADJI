@@ -35,61 +35,65 @@ number, 1-4, corresponding to the DIP switches on the device.
 The joystick test screen reads the joystick, and shows on screen which
 directions are being pressed.
 
-## `*JJOY` - use the digital joystick as an analogue joystick
+## `*JSETUP` - set up the joystick
 
-`*JJOY` hooks into the analogue joystick processing, so the digital
-joystick appears to be an analogue joystick. Use this to play games
-with existing joystick support.
+**WIP instructions**
 
-It takes two parameters:
+You'll be prompted for the following:
 
-1. Joystick number, 1-4, as above
-2. Overlay address, or `X` to use extended vectors
+`Joystick no (1/2/3/4)?` - enter the joystick number.
 
-The Acorn-approved way for the joystick ROM to operate is to hook into
-things using the extended vectors. Many games overwrite the extended
-vectors, however, so this method may result in crashes or hangs.
+`Joystick/Keys (J/K)?` - press `J` to have the joystick behave as an
+analogue joystick, or `K` to have it translated into keypresses for
+games.
 
-As an alternative, the joystick ROM can hook into things using a
-20-byte overlay routine stored in main RAM. The recommended standard
-address is &150, an area of the CPU stack that is typically unused,
-but (with caution) any address from 0 to &7FE0 can be used.
-
-If specifying an address in hex, precede with `&`, same as BASIC.
-
-Once `*JJOY` is active, `ADVAL`/OSBYTE &80 will start to return
-digital joystick info:
+If behaving as an analogue joystick, it behaves as if it's the first
+analogue joystick, and its state can be read with `ADVAL` or OSBYTE
+&80:
 
 - `ADVAL(0)` reports the digital fire button
 - `ADVAL(1)` reports the digital left/right axis
 - `ADVAL(2)` reports the digital up/down axis
 
+If behaving as keys, it hooks into the processing of `INKEY` and
+OSBYTE &81 - the goal being to support its use with games. The
+joystick can't be used for ordinary text input.
+
+`Press UP:`, `Press DOWN:`, `Press LEFT:`, `Press RIGHT:`, `Press
+FIRE:` - if you opted for keys mode, you'll be prompted for the key that each joystick action should correspond to.
+
+`Xvector/Overlay (X/O)?` - pick the method the ROM uses to hook into
+the keyboard and joystick processing.
+
+`Xvector` uses the extended vectors, which would be the Acorn-approved
+method, but many games overwrite the relevant OS workspace and so you
+may experience crashes or hangs. 
+
+`Overlay` installs a short (max 20 bytes) routine somewhere in RAM to
+handle the hooking. There's no best place for this, so you'll be
+prompted for an address! The default of &150, which will be used if
+you just press Return when prompted, should be good for many games.
+
+If providing an address in hex, precede with `&`, as per BASIC.
+
+Once the questions are over, `*JSETUP` will install the hooks and
+finish. Last thing it does is print a `*JKEYS` or `*JJOY` command
+line, that you can note down and use later to set up the same settings
+non-interactively (e.g., from `!BOOT` or a loader program).
+
 ## `*JOFF` - switch digital joystick support off
 
 No parameters required.
 
-## `*JKSETUP` - use the digital joystick as keys
+## `*JJOY` - use the digital joystick as an analogue joystick
 
-`*JKSETUP` hooks into the keyboard processing, so the digital joystick
-appears to be particular keys on the keyboard. Use this to play games
-that don't support joysticks.
+`*JJOY` takes 2 parameters:
 
-`*JKSETUP` takes two parameters, same as `*JJOY`.
-
-Press a key when prompted - each key is the one corresponding to that
-axis or button.
-
-Once `*JKSETUP` is active, the joystick will affect the following
-calls:
-
-- OSBYTE &79/KEYV
-- OSBYTE &7A
-- `INKEY`/OSBYTE &81
+1. Joystick number, 1-4, as per `*JTEST`
+2. Overlay address (precede with `&` if in hex), or `X` to use
+   extended vectors
 
 ## `*JKEYS` - use the digital joystick as keys
-
-If you know the negative INKEY values of the keys, you can use
-`*JKEYS` to configure the joystick without requiring any input.
 
 `*JKEYS` takes 7 parameters, with all keys specified as negative INKEY
 values:
@@ -102,8 +106,8 @@ values:
 6. Key for fire
 7. Overlay address or `X', as above
 
-`*JKSETUP` will print out a suitable `*JKEYS` command line, which you
-can later use to set up the same keys again.
+Easiest thing to do is use `*JSETUP`, which will prompt you for the
+keys and print a command line you can use again.
 
 Negative INKEY values are as follows. Keys common to all systems:
 
@@ -154,12 +158,8 @@ Keys specific to B/Master:
 
 # Limitations/bugs
 
-- `*JKSETUP` doesn't examine the address/overlay parameter until after
-  you've pressed the keys. So if you enter something invalid, you
-  won't get the error immediately
-  
-- Joystick keys don't affect OSRDCH, so you can use them to press keys
-  at the BASIC prompt, or when using `INPUT`, etc.
+- Joystick keys don't affect OSRDCH, so you can't use them to press
+  keys at the BASIC prompt, or when using `INPUT`, etc.
   
 - `*JJOY` effectively disables both analogue joysticks, even though it
   could pass through to one of them and it wouldn't interfere
@@ -170,3 +170,16 @@ Keys specific to B/Master:
 
 The ROM uses 1 page of HAZEL to store its data.
 
+# Compatibility notes
+
+In most cases, you'll find things work using an overlay address of
+&150. This list notes the exceptions I've found.
+
+## Frak (Superior re-release) (Master 128)
+
+Works with overlay address of &120.
+
+## Zalaga (Superior re-release) (Master 128)
+
+Hooks are simply ignored. Perhaps it resets the vectors. To be
+investigated.
