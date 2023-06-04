@@ -690,53 +690,12 @@ action_index: .fill 1
                 jsr question
                 bcs done
                 sty jkeys
-
-                ldx #questions_table.xo
-                jsr question
-                bcs done
-                sty use_overlay
-                cpy #0
-                beq got_hook_details ;taken if xvector
-
-                jsr print_following_string
-                .text 'Overlay addr (default: &',format('%X',default_overlay_address),'): ',0
-
-                ; seems to be usual to put the parameter block in main
-                ; RAM, rather than referring to one in the ROM?
-                ldy #4
--
-                lda osword_block,y
-                sta input_block,y
-                dey
-                bpl -
-
-                ldx #<input_block
-                ldy #>input_block
-                lda #0
-                jsr osword
-                bcs done
-
-                lda #<default_overlay_address
-                sta strtoi_value+0
-                lda #>default_overlay_address
-                sta strtoi_value+1
-                
-                lda #<input_buffer
-                sta $f2
-                lda #>input_buffer
-                sta $f3
-                ldy #0
-                jsr find_string_tail
-                bcs got_hook_details ;taken if empty input - use
-                                     ;default
-                
-                jsr strtoi
-got_hook_details:
-                
-                lda jkeys
-                bne keys         ;taken if keys
+                tya
+                bne keys        ;taken if keys
 
 joy:
+                jsr hook_question
+                
                 jsr print_following_string
                 .text '*JKEYS ',0
 
@@ -792,6 +751,8 @@ actions_loop:
                 ldx #0
                 jsr osbyte
 
+                jsr hook_question
+
                 ; Print *JKEYS command line
                 jsr print_following_string
                 .text '*JKEYS ',0
@@ -822,6 +783,46 @@ print_keys_loop:
 done:
                 rts
 
+hook_question:
+                ldx #questions_table.xo
+                jsr question
+                bcs done
+                sty use_overlay
+                cpy #0
+                beq done        ;bail if xvector
+
+                jsr print_following_string
+                .text 'Overlay addr (default: &',format('%X',default_overlay_address),'): ',0
+
+                ; seems to be usual to put the parameter block in main
+                ; RAM, rather than referring to one in the ROM?
+                ldy #4
+-
+                lda osword_block,y
+                sta input_block,y
+                dey
+                bpl -
+
+                ldx #<input_block
+                ldy #>input_block
+                lda #0
+                jsr osword
+                bcs done
+
+                lda #<default_overlay_address
+                sta strtoi_value+0
+                lda #>default_overlay_address
+                sta strtoi_value+1
+                
+                lda #<input_buffer
+                sta $f2
+                lda #>input_buffer
+                sta $f3
+                ldy #0
+                jsr find_string_tail
+                bcs done        ;taken if empty input - use default
+                jmp strtoi
+                
 print_jno:
                 lda jno
                 clc
