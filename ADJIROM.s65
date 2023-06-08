@@ -761,6 +761,7 @@ cmd_jtest: .proc
                 .section cmd_jtest_workspace
 joystick_index: .fill 1
 action_index: .fill 1
+jvalue: .fill 1
                 .endsection
                 
                 jsr parse_jno
@@ -768,7 +769,7 @@ action_index: .fill 1
                 
                 jsr print_following_string
                 .text 22,135
-                .text 31,8,5
+                .text 31,8,1
                 .text "J O Y S T I C K   T E S T"
                 .byte 0
 
@@ -778,9 +779,40 @@ loop:
                 bit $ff
                 bmi done        ;taken if Escape pressed
 
+                ldx joystick_index
+                jsr read_joystick
+                sta jvalue
+
+                jsr print_following_string
+                .text 31,5,5,"Raw value: &",0
+
+                lda jvalue
+                jsr print_hex_byte
+
+                jsr print_following_string
+                .text " (%",0
+
+                ldx #8
+                ldy jvalue
+binary_loop:
+                tya
+                asl a
+                tay
+
+                lda #'0'
+                adc #0
+                jsr oswrch
+
+                dex
+                bne binary_loop
+
+                jsr print_following_string
+                .text ")",0
+
                 lda #4
                 sta action_index
 check_actions:
+                
                 jsr print_following_string
                 .byte 31,17,0
                 
@@ -789,9 +821,8 @@ check_actions:
                 adc #10         
                 jsr oswrch      ;PRINT TAB(17,Y)
 
-                ldx joystick_index
-                jsr read_joystick
-                
+                lda jvalue
+
                 ldx action_index
                 and joystick_actions.masks,x
                 bne +
