@@ -596,6 +596,7 @@ action_index: .fill 1
 
 joy:
                 jsr hook_question
+                bcs done
                 
                 jsr print_following_string
                 .text '*JKEYS ',0
@@ -631,6 +632,9 @@ actions_loop:
 
                 jsr verbose_get_key
 
+                bit $ff
+                bmi done
+
                 jsr osnewl
 
                 clc
@@ -653,6 +657,7 @@ actions_loop:
                 jsr osbyte
 
                 jsr hook_question
+                bcs done
 
                 ; Print *JKEYS command line
                 jsr print_following_string
@@ -847,13 +852,13 @@ done:
 
 cmd_ktest: .proc
                 jsr print_following_string
-                .text 'Press keys...',10,13,0
+                .text 'Press keys',0
 
 ktest_loop:
-                jsr verbose_get_key
-
                 jsr print_following_string
                 .text ' | ',0
+
+                jsr verbose_get_key
 
                 bit $ff
                 bpl ktest_loop
@@ -1903,6 +1908,7 @@ keys_loop:
                 lda #$81
                 jsr osbyte_yff
                 pla             ;restore INKEY number
+                
                 cpx #$ff        ;C=1 if pressed
                 beq pressed     ;taken if pressed
 
@@ -1916,6 +1922,14 @@ keys_loop:
                 bcc main_loop
 
 pressed:
+                ; If it's escape, sort it out.
+                cmp #inkey(key_escape)
+                bne not_escape_pressed
+
+                lda #$7d        ;Set Escape condition (AUG p148)
+                jmp osbyte
+
+not_escape_pressed:
                 ; If still waiting for no keys, go right back to the
                 ; start. The flag will remain set.
                 bit waiting_for_no_keys

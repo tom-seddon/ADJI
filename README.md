@@ -39,7 +39,8 @@ directions are being pressed.
 
 **WIP instructions**
 
-You'll be prompted for the following:
+You'll be prompted for the following. Press Escape at any time to
+cancel.
 
 `Joystick no (1/2/3/4)?` - enter the joystick number.
 
@@ -60,7 +61,12 @@ OSBYTE &81 - the goal being to support its use with games. The
 joystick can't be used for ordinary text input.
 
 `Press UP:`, `Press DOWN:`, `Press LEFT:`, `Press RIGHT:`, `Press
-FIRE:` - if you opted for keys mode, you'll be prompted for the key that each joystick action should correspond to.
+FIRE:` - if you opted for keys mode, you'll be prompted for the key
+that each joystick action should correspond to. 
+
+(If you press Escape here, it'll cancel the setup. If you want to bind
+a joystick action to Escape, you'll need to use the `*JKEYS` command,
+described below.)
 
 `Xvector/Overlay (X/O)?` - pick the method the ROM uses to hook into
 the keyboard and joystick processing.
@@ -77,9 +83,10 @@ you just press Return when prompted, should be good for many games.
 If providing an address in hex, precede with `&`, as per BASIC.
 
 Once the questions are over, `*JSETUP` will install the hooks and
-finish. Last thing it does is print a `*JKEYS` or `*JJOY` command
-line, that you can note down and use later to set up the same settings
-non-interactively (e.g., from `!BOOT` or a loader program).
+finish. Last thing it does is print a `*JKEYS` (see below) or `*JJOY`
+(see below) command line, that you can note down and use later to set
+up the same settings non-interactively (e.g., from `!BOOT` or a loader
+program).
 
 ## `*JOFF` - switch digital joystick support off
 
