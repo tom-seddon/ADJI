@@ -47,7 +47,7 @@ keyv_osbyte=83
 brkbuf=$100
 
 rom_name='ADJI'
-rom_ver='0.01'
+rom_ver='0.02'
 
 default_overlay_address=$150
                 
