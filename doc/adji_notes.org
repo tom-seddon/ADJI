@@ -62,19 +62,14 @@ Slogger presumably knew it well.
 
 $290 can stay as-is. Set the `9` bit.
 
-The ROM table presents a slight problem, as the ADJI will contain a
-ROM! (And while fiddling, might as well try to fix the slot
-restriction too. It'd be nice to be able to plug the ADJI into either
-socket.)
+The ADJI ROM uses 3 of the ROM table bytes (2 entries for keyboard, 1
+for lower-priority BASIC), and 3 unused locations: $2f5, $2f6 and
+$27e.
 
-One byte will be available: `?&F4 EOR 1`, the other ROM bank
-(unoccupied) corresponding to the cartridge slot the ADJI is in.
-
-For the missing byte - $2f5 and $2f6 are unused?
-
-(For development purposes, the ADJI can go in any slot, and this case
-should be detected. Might also later want to put the ADJI code into an
-updated Electron Expansion ROM, too.)
+The other ROM table bytes are unused. In theory, since the ADJI
+cartridge occupies two banks, but the ADJI ROM will only use one of
+them, there's an extra bank at `?&F4 EOR1` - but that's a lot of
+hassle during development.
 
 # ADJI memory usage - Master 128
 
@@ -100,3 +95,8 @@ Works OK with extended vectors
 ## Aviator
 
 Crashes - looks like it scribbles over page $d!
+
+## Firebug
+
+Works OK with overlay at &150
+
