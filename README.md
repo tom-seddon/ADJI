@@ -33,7 +33,9 @@ number, 1-4, corresponding to the DIP switches on the device.
 | 4 | &FCF0 |
 
 The joystick test screen reads the joystick, and shows on screen which
-directions are being pressed.
+directions and/or buttons are being pressed.
+
+The ADJI supports 2 independent fire buttons if the joystick has them.
 
 ## `*JSETUP` - set up the joystick
 
@@ -52,7 +54,7 @@ If behaving as an analogue joystick, it behaves as if it's the first
 analogue joystick, and its state can be read with `ADVAL` or OSBYTE
 &80:
 
-- `ADVAL(0)` reports the digital fire button
+- `ADVAL(0)` reports the digital fire button 1
 - `ADVAL(1)` reports the digital left/right axis
 - `ADVAL(2)` reports the digital up/down axis
 
@@ -61,8 +63,8 @@ OSBYTE &81 - the goal being to support its use with games. The
 joystick can't be used for ordinary text input.
 
 `Press UP:`, `Press DOWN:`, `Press LEFT:`, `Press RIGHT:`, `Press
-FIRE:` - if you opted for keys mode, you'll be prompted for the key
-that each joystick action should correspond to. 
+FIRE1:`, `Press FIRE2:` - if you opted for keys mode, you'll be
+prompted for the key that each joystick action should correspond to.
 
 (If you press Escape here, it'll cancel the setup. If you want to bind
 a joystick action to Escape, you'll need to use the `*JKEYS` command,
@@ -110,8 +112,9 @@ values:
 3. Key for down
 4. Key for left
 5. Key for right
-6. Key for fire
-7. Overlay address or `X', as above
+6. Key for fire button 1
+7. Key for fire button 2
+8. Overlay address or `X', as above
 
 Easiest thing to do is use `*JSETUP`, which will prompt you for the
 keys and print a command line you can use again.
