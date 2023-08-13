@@ -51,8 +51,8 @@ rom_ver='0.02'
 
 default_overlay_address=$150
                 
-; Up=0, Down=1, Left=2, Right=3, Fire=4
-num_actions=5
+; Up=0, Down=1, Left=2, Right=3, Fire1=4, Fire2=5
+num_actions=6
 
 ;-------------------------------------------------------------------------
 ;
@@ -103,8 +103,7 @@ action_keys: .fill num_actions
 ; Also unused on Electron:
 ;
 ; $0261 - "speech suppression status" - unused in practice?
-; $027e - unused
-; $2082 - used by MRB??
+; $0282 - used by MRB??
 ; $028a - used by MRB??
 ; $028b - used by MRB??
 ; 
@@ -113,7 +112,8 @@ elk_up=$02a8                    ;ROM flags for keyboard
 elk_down=$02a9                  ;ROM flags for keyboard
 elk_left=$02aa                  ;ROM flags for lower-priority BASIC
 elk_right=$02f5                 ;unused by Electron OS
-elk_fire=$02f6                  ;unused by Electron OS
+elk_fire1=$02f6                 ;unused by Electron OS
+elk_fire2=$027e                 ;unused by Electron OS
 
 ;-------------------------------------------------------------------------
 
@@ -125,8 +125,9 @@ jup_mask=1
 jdown_mask=2
 jleft_mask=4
 jright_mask=8
-jfire_mask=16
-jall_mask=jfire_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
+jfire1_mask=16
+jfire2_mask=32
+jall_mask=jfire2_mask|jfire1_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
                 
 ;-------------------------------------------------------------------------
 
@@ -259,7 +260,7 @@ none_offset=*-help_table
 jjoy_offset=*-help_table
                 .text ' <no> X|<addr>',0
 jkeys_offset=*-help_table
-                .text ' <no> <up> <down> <left> <right> <fire> X|<addr>',0
+                .text ' <no> <up> <down> <left> <right> <fire1> <fire2> X|<addr>',0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -289,7 +290,12 @@ electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
 
 joystick_actions: .block
 masks:
-                .byte 1,2,4,8,16
+                .byte jup_mask
+                .byte jdown_mask
+                .byte jleft_mask
+                .byte jright_mask
+                .byte jfire1_mask
+                .byte jfire2_mask
 names:
                 ;      01234
                 .text "     "
@@ -297,7 +303,8 @@ names:
                 .text "DOWN "
                 .text "LEFT "
                 .text "RIGHT"
-                .text "FIRE "
+                .text "FIRE1"
+                .text "FIRE2"
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -308,7 +315,8 @@ elk_state_offsets: .proc
                 .byte <elk_down
                 .byte <elk_left
                 .byte <elk_right
-                .byte <elk_fire
+                .byte <elk_fire1
+                .byte <elk_fire2
                 .endproc
                 
 joystick_fred_offsets:
@@ -599,7 +607,7 @@ joy:
                 bcs done
                 
                 jsr print_following_string
-                .text '*JKEYS ',0
+                .text '*JJOY ',0
 
                 jsr print_jno
                 jsr print_hook_info
@@ -657,7 +665,9 @@ actions_loop:
                 jsr osbyte
 
                 jsr hook_question
-                bcs done
+
+                bit $ff
+                bmi done
 
                 ; Print *JKEYS command line
                 jsr print_following_string
@@ -814,7 +824,7 @@ binary_loop:
                 jsr print_following_string
                 .text ")",0
 
-                lda #4
+                lda #num_actions-1
                 sta action_index
 check_actions:
                 
@@ -1800,7 +1810,7 @@ test_fire:
                 ldy #4          ;fake last ADC conversion channel
                 
                 lda os_a
-                and #jfire_mask
+                and #jfire1_mask
                 bne fire_yes
 fire_no:
                 ldx #0
