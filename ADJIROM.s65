@@ -46,7 +46,11 @@ keyv_osbyte=83
 
 brkbuf=$100
 
+                .if debug
+rom_name='ADJI (debug) '..debug_time
+                .else
 rom_name='ADJI'
+                .endif
 rom_ver='0.03'
 
 default_overlay_address=$150

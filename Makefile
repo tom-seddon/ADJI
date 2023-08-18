@@ -20,7 +20,7 @@ BEEB_BIN:=$(PWD)/submodules/beeb/bin
 ##########################################################################
 ##########################################################################
 
-_V:=$(if $(VERBOSE),time ,@)
+_V:=$(if $(VERBOSE),,@)
 
 ##########################################################################
 ##########################################################################
@@ -38,7 +38,7 @@ build:
 	$(_V)$(PYTHON) tools/print_key_tables.py >"$(BUILD)/generated_key_tables.s65"
 
 	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=false "--list=$(BUILD)/ADJIROM.lst" "--output=$(BUILD)/ADJIROM.bin" "--map=$(BUILD)/ADJIROM.map" ADJIROM.s65
-	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=true "--list=$(BUILD)/ADJIROM_debug.lst" "--output=$(BUILD)/ADJIROM_debug.bin" ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=true "-Ddebug_time=\"$(shell $(SHELLCMD) strftime -d _ _Y_m_d-_H_M_S)\"" "--list=$(BUILD)/ADJIROM_debug.lst" "--output=$(BUILD)/ADJIROM_debug.bin" ADJIROM.s65
 
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJIROM"
 	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJIROM"
