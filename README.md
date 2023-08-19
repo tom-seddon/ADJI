@@ -8,8 +8,6 @@ https://github.com/tom-seddon/SloggerElectronExpansion
 
 **Extremely WIP**
 
-**Only actually supports Master 128 at the moment**
-
 # Using the ADJI
 
 Requires Electron or Master 128.

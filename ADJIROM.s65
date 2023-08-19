@@ -20,10 +20,13 @@ os_seiwk=$fa
 ; only safe to use with IRQs disabled!
 os_seia=$fc
 
+; 2 bytes unused on Electron. Used for the OSBYTE timeout.
+elk_osbyte_81_timeout=$f8
+                
 ; Fortunately the same on Electron OS 1.00 and Master MOS.
 os_auto_repeat_countdown=$e7
 os_auto_repeat_period=$255
-                
+
 ; Routines that do PLA:<<restore ROM>>:PLA:PLP:RTS - as is part of the
 ; extended vector handling mechanism.
 os_restore_rom_master=$ffa4
@@ -73,6 +76,8 @@ jindex_mask=%00000011
 jkeys_mask=%00000100
                 
 ; If set, treat joystick inputs as analogue inputs.
+;
+; This flag is tested with BIT, so the value is not arbitrary.
 jjoy_mask=%01000000
                 .fill 1
                 .endblock
@@ -192,6 +197,7 @@ struct_section: .macro
                 .dsection star
                 .dsection common
                 .dsection master_only
+                .dsection electron_only
                 .dsection library
                 
                 .if debug
@@ -284,6 +290,7 @@ no_free_hazel: .error_table_entry $ff,'No free FS RAM'
 bad_mode: .error_table_entry $ff,'Bad mode'
 todo_offset: .error_table_entry $ff,'TODO'
 electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
+unexpected_os: .error_table_entry $ff,'Unexpected Electron OS'
                 .endblock
                 
 ;-------------------------------------------------------------------------
@@ -325,6 +332,14 @@ elk_state_offsets: .proc
                 
 joystick_fred_offsets:
                 .byte $c0,$d0,$e0,$f0
+
+joystick_action_masks:
+                .byte 1
+                .byte 2
+                .byte 4
+                .byte 8
+                .byte 16
+                .byte 32
 
 ;-------------------------------------------------------------------------
 
@@ -608,7 +623,9 @@ action_index: .fill 1
 
 joy:
                 jsr hook_question
-                bcs done
+
+                bit $ff
+                bmi done
                 
                 jsr print_following_string
                 .text '*JJOY ',0
@@ -923,16 +940,85 @@ loop:
 ; 
 install_overlay: .proc
                 jsr must_be_valid_hw
-                bvs +
-                ldx #errors_table.electron_todo_offset
+                bvs master
+
+electron:
+                ; Check the ROM is at least roughly as expected...
+                lda os_restore_rom_electron+0
+                cmp #$68        ;PLA
+                bne os_wut 
+                lda os_restore_rom_electron+1
+                cmp #$20        ;JSR abs
+                bne os_wut
+                
+                ldy #size(overlay_electron)-1
+electron_loop:
+                lda overlay_electron,y
+                sta (strtoi_value),y
+                dey
+                bpl electron_loop
+
+                ; Fix up ROM bank.
+                ldy #overlay_electron.rom_offset
+                lda $f4
+                sta (strtoi_value),y
+
+                .if debug
+                ldy #0
+print_overlay_loop:
+                lda (strtoi_value),y
+                jsr print_hex_byte
+                lda #' '
+                jsr oswrch
+                iny
+                cpy #size(overlay_electron)
+                bne print_overlay_loop
+                jsr osnewl
+                .endif
+
+                ; Point BYTEV to the right place.
+                lda #overlay_electron.osbyte_entry_offset
+                jsr set_overlay_bytev
+
+                .if debug
+                lda bytev+1
+                jsr print_hex_byte
+                lda bytev+0
+                jsr print_hex_byte
+                jsr osnewl
+
+                lda elk_jflags
+                jsr print_hex_byte
+                jsr osnewl
+                lda #'.'
+                jsr oswrch
+                .endif
+
+                ; Maybe point KEYV to the right place.
+                ldx #overlay_electron.keyv_entry_offset
+                jsr maybe_set_overlay_keyv
+
+                .if debug
+                lda keyv+1
+                jsr print_hex_byte
+                lda keyv+0
+                jsr print_hex_byte
+                jsr osnewl
+                .endif
+                
+                rts
+
+os_wut:
+                ldx #errors_table.unexpected_os
                 jmp do_error
-+
+                
+master:
                 ldy #size(overlay_master)-1
-loop:
+master_loop:
                 lda overlay_master,y
                 sta (strtoi_value),y
                 dey
-                bpl loop
+                bpl master_loop
 
                 ; Fix up ROMSEL value.
                 ldy #overlay_master.rom_offset
@@ -947,21 +1033,24 @@ loop:
 
                 ; Point BYTEV to the right place.
                 lda #overlay_master.osbyte_entry_offset
-                ldx #<bytev
-                jsr set_overlay_vector
+                jsr set_overlay_bytev
 
                 ; Maybe point KEYV to the right place.
+                ldx #overlay_master.keyv_entry_offset
+                jsr maybe_set_overlay_keyv
+
+                rts
+                
+maybe_set_overlay_keyv:
                 ldy #State.jflags
                 jsr read_state
                 and #State.jflags.jkeys_mask
-                beq keyv_done
-                lda #overlay_master.keyv_entry_offset
+                beq overlay_vector_set
+                txa
                 ldx #<keyv
-                jsr set_overlay_vector
-keyv_done:
-
-                rts
-
+                bne set_overlay_vector ;always taken
+set_overlay_bytev:
+                ldx #<bytev
 set_overlay_vector:
                 php
                 sei
@@ -972,6 +1061,7 @@ set_overlay_vector:
                 adc #0
                 sta $201,x
                 plp
+overlay_vector_set:
                 rts
                 .endproc
 
@@ -986,18 +1076,14 @@ xvectors: .fill 2
                 .endsection
                 lda #$a8        ;read extended vector table address
                 jsr osbyte_x00_yff
-                ; ldx #$00
-                ; ldy #$ff
-                ; jsr osbyte
                 stx xvectors+0
                 sty xvectors+1
 
                 jsr must_be_valid_hw
+                ldx #0          ;assume Master
                 bvs +           ;taken if Master 128
-                ldx #errors_table.electron_todo_offset
-                jmp do_error
+                ldx #2          ;Electron
 +
-
                 php
                 sei
 
@@ -1006,10 +1092,10 @@ xvectors: .fill 2
                 sta bytev+1
                 ldy #(<bytev)/2*3
                 sty bytev+0
-                lda #<handle_osbyte_xvector_master
+                lda bytev_values+0,x
                 sta (xvectors),y
                 iny
-                lda #>handle_osbyte_xvector_master
+                lda bytev_values+1,x
                 sta (xvectors),y
                 iny
                 lda $f4
@@ -1025,10 +1111,10 @@ xvectors: .fill 2
                 sta keyv+1
                 ldy #(<keyv)/2*3
                 sty keyv+0
-                lda #<handle_keyv_xvector_master
+                lda keyv_values+0,x
                 sta (xvectors),y
                 iny
-                lda #>handle_keyv_xvector_master
+                lda keyv_values+1,x
                 sta (xvectors),y
                 iny
                 lda $f4
@@ -1037,9 +1123,449 @@ keyv_done:
                 
                 plp
                 rts
+
+
+                ; The Electron xvector entry points are simplified, as
+                ; there's no fiddling around to ensure HAZEL is paged
+                ; in.
+                
+bytev_values:
+                .word handle_osbyte_xvector_master
+                .word handle_osbyte_electron.osbyte_xvector_entry
+
+keyv_values:
+                .word handle_keyv_xvector_master
+                .word handle_osbyte_electron.keyv_xvector_entry
+                
                 .endproc
 ;-------------------------------------------------------------------------
                 .endsection common
+;-------------------------------------------------------------------------
+                .section electron_only
+;-------------------------------------------------------------------------
+
+overlay_electron: .block
+keyv_entry_offset=*-overlay_electron
+                lda #keyv_osbyte
+osbyte_entry_offset=*-overlay_electron
+                php             ;P RetL RetH
+                sei
+                pha             ;A P RetL RetH
+                lda #12
+                sta $fe05
+rom_offset=*+1-overlay_electron
+                lda #$ff
+                sta $fe05
+                jmp handle_overlay_electron
+                .endblock
+                .cerror size(overlay_electron)>128,'Electron overlay too large'
+
+;-------------------------------------------------------------------------
+
+
+handle_overlay_electron:
+                ; Save this ROM bank.
+                sta os_seiwk+1
+
+                ; Save input A.
+                pla             ;P RetL RetH
+                sta os_seiwk+0
+
+                ; Save input P.
+                pla             ;RetL RetH
+                sta os_seia
+
+                ; Save previous ROM.
+                lda $f4
+                pha             ;ROMSEL RetL RetH
+
+                ; Fix up $f4.
+                lda os_seiwk+1
+                sta $f4
+
+                ; Insert overlay exit routine address
+                lda #>handle_overlay_exit_electron-1
+                pha             ;ExitH ROMSEL RetL RetH
+                lda #<handle_overlay_exit_electron-1
+                pha             ;ExitL ExitH ROMSEL RetL RetH
+
+                ; Put input P back on stack. Don't possibly re-enable
+                ; IRQs just yet - A is still in os_seiwk.
+                lda os_seia
+                pha             ;P ExitL ExitH ROMSEL RetL RetH
+
+                ; Reinstate input A.
+                lda os_seiwk+0
+                pha             ;A P ExitL ExitH ROMSEL RetL RetH
+
+                jmp handle_osbyte_electron
+
+; Entry: A/X/Y/P as per OSBYTE/KEYV return
+; Stack: ROMSEL RetL RetH
+handle_overlay_exit_electron:
+                pha             ;A ROMSEL RetL RetH
+                php             ;P A ROMSEL RetL RetH
+                txa
+                pha             ;X P A ROMSEL RetL RetH
+                tsx             ;| X P A ROMSEL RetL RetH
+                lda $104,x      ;ROMSEL
+                pha             ;ROMSEL | X P A ROMSEL RetL RetH
+                lda $102,x      ;P
+                sta $104,x      ;ROMSEL | X P A P RetL RetH
+                pla             ;| X P A P RetL RetH
+                sta $102,x      ;| X ROMSEL A P RetL RetH
+                pla             ;ROMSEL A P RetL RetH
+                tax
+                jmp os_restore_rom_electron
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE/KEYV handler for Electron.
+;
+; Entry: A, X, Y = OSBYTE/KEYV arguments
+
+handle_osbyte_electron: .proc
+                ; Don't use the OSBYTE zero page yet - this call might
+                ; be KEYV.
+                pla             ;P ExitL ExitH ROMSEL RetL RetH
+                cmp #keyv_osbyte
+                beq is_keyv
+
+is_osbyte:
+                plp             ;though not actually important for
+                                ;OSBYTE
+osbyte_xvector_entry:
+                sta os_a
+                stx os_x
+                sty os_y
+
+                cmp #$80
+                beq osbyte_80_electron
+
+                ; cmp #$81
+                ; beq osbyte_81_electron
+unhandled:
+                ldx os_x
+unhandled_got_x:
+                ldy os_y
+                jmp jmp_default_osbyte
+
+is_keyv:
+                plp
+keyv_xvector_entry:
+                jmp keyv_electron
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE $81 handler for Electron.
+;
+; Entry: A = $81, ?os_a = $81
+;        ?os_x, ?os_y = OSBYTE $81 entry arguments
+
+; osbyte_81_electron: .proc
+;                 ; Skip if jkeys bit not set.
+;                 lda elk_jflags
+;                 and #State.jflags.jkeys_mask
+;                 cmp #1          ;C=1 if set
+
+;                 ; Defer to default OSBYTE if jkeys off.
+;                 ldx os_x
+;                 lda os_a
+;                 ldy os_y
+;                 bcc jmp_default_osbyte.with_p_already_pushed
+
+;                 ; Go to timeout case if Y<$80
+;                 bpl timeout
+
+;                 ; Call default OSBYTE if Y!=$ff
+;                 cpy #$ff
+;                 bne jmp_default_osbyte.with_p_already_pushed
+
+;                 ; Call default OSBYTE for the X=$00 Y=$FF version
+;                 ; call.
+;                 cpx #0
+;                 beq jmp_default_osbyte.with_p_already_pushed
+
+;                 ; Is this one of the jkeys?
+;                 lda os_x
+;                 eor #$ff        ;convert to internal key
+
+;                 ldy #num_actions-1 ;Y=action index
+; poll_key_loop:
+;                 ldx elk_state_offsets+State.action_keys,y
+;                 cmp $200,x
+;                 beq found_key
+;                 dey
+;                 bne poll_key_loop
+; not_found_key:
+;                 lda #$81
+;                 ldy #$ff
+;                 ldx os_x
+;                 jmp jmp_default_osbyte.with_p_already_pushed
+
+; found_key:
+;                 lda elk_jflags
+;                 and #3
+;                 tay
+;                 lda joystick_fred_offsets,y
+;                 tay
+;                 lda $fc00,y
+;                 and joystick_action_masks
+;                 beq not_found_key
+
+;                 ldx #$ff
+;                 ldy #$ff
+;                 lda #$81
+;                 rts
+
+; timeout:
+;                 ; Form negated timeout.
+;                 txa
+;                 eor #$ff
+;                 sta elk_osbyte_81_timeout+0
+;                 tya
+;                 eor #$ff
+;                 sta elk_osbyte_81_timeout+1
+; loop:
+;                 ; Read joystick
+;                 lda elk_jflags
+;                 and #3
+;                 tax
+;                 lda $fc00,x
+;                 and #jall_mask
+;                 beq try_osbyte  ;taken if obviously nothing pressed
+
+;                 ; Find state offset for action.
+;                 ldy #State.action_keys-1
+; find_index_loop:
+;                 iny
+;                 lsr a
+;                 bcc find_index_loop
+
+;                 ldx elk_state_offsets,y
+;                 bpl jkey_pressed
+
+; try_osbyte:
+;                 ldy #0
+;                 ldx #1
+;                 lda #$81
+;                 jsr jmp_default_osbyte
+;                 cpy #$ff
+;                 bne kkey_pressed
+
+; next:
+;                 inc elk_osbyte_81_timeout+0
+;                 bne loop
+;                 inc elk_osbyte_81_timeout+1
+;                 bne loop
+
+;                 ; Timed out. Return with C=1 and Y=$ff
+;                 ldy #$ff
+;                 sec
+;                 rts
+
+; kkey_pressed:
+;                 rts
+
+; jkey_pressed:
+;                 ldx os_auto_repeat_countdown
+;                 beq reset_auto_repeat_countdown
+;                 dec os_auto_repeat_countdown
+;                 bne try_osbyte
+; reset_auto_repeat_countdown:
+;                 ldx os_auto_repeat_period
+;                 stx os_auto_repeat_countdown
+
+;                 php             ;save old IRQ status
+;                 pha             ; save internal key number
+
+;                 lda #$ac        ;Keyboard translation table address
+;                 jsr osbyte_x00_yff
+;                 sei
+;                 stx os_seiwk+0
+;                 sty os_seiwk+1
+;                 pla             ;restore internal key number
+;                 tay             ;Y=internal key number
+;                 lda (os_seiwk),y
+;                 bne +           ;taken if not TAB
+;                 lda os_tab_key_code
+; +
+;                 ; The Slogger ROM doesn't handle shift, ctrl, caps
+;                 ; lock, etc., so this one doesn't either.
+;                 jsr toupper
+
+;                 tax             ;X=ASCII value of key pressed
+;                 plp             ;restore old IRQ state
+;                 lda os_a
+;                 ldy #0
+;                 clc
+;                 rts
+;                
+;                .endproc
+
+;-------------------------------------------------------------------------
+;
+; OSBYTE $80 handler for Electron.
+;
+; Entry: A = $80, ?os_a = $80
+;        ?os_x, ?os_y = OSBYTE $80 entry arguments
+;
+osbyte_80_electron: .proc
+                ; Bail if not ADVAL.
+                ldx os_x
+                cpx #5
+                bcs handle_osbyte_electron.unhandled_got_x
+
+                ; Bail if not jjoy mode.
+                bit elk_jflags
+                bvc handle_osbyte_electron.unhandled_got_x
+
+                ; Fetch joystick index.
+                lda elk_jflags
+                and #3
+
+                ; ?os_a = joystick value
+                tay
+                lda joystick_fred_offsets,y
+                tay
+                lda $fc00,y
+                sta os_a
+
+                jmp osbyte_80_generic
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; KEYV handler for Electron.
+;
+; Entry: A = keyv_osbyte
+;        X, Y = KEYV arguments
+keyv_electron: .proc
+                ; php             ;save P
+                ; pla
+                ; pha
+                ; and #%01000001  ;separate C+V
+                ; cmp #%00000001  ;check for C=1 V=0
+                ; beq scan
+
+                ; Forward to default KEYV.
+                jmp jmp_default_keyv.with_p_already_pushed
+
+; scan:
+;                 sta os_a
+;                 sty os_y
+
+;                 lda elk_jflags
+;                 and #State.jflags.jkeys_mask
+;                 beq jmp_default_keyv.with_p_already_pushed
+
+;                 ; Check for keyboard scan mode.
+;                 txa
+;                 bpl scan_multiple_keys
+
+; scan_single_key:
+;                 ; Convert to internal key number.
+;                 and #$7f
+;                 sta os_x
+
+;                 ; Read joystick flags.
+;                 lda elk_jflags
+;                 and #State.jflags.jkeys_mask
+;                 beq default
+;                 lda elk_jflags
+;                 and #3
+;                 tax
+;                 ldy joystick_fred_offsets,x
+;                 lda $fc00,y
+
+;                 ldx os_x        ;key of interest
+                
+;                 cpx elk_up
+;                 beq test_up
+
+;                 cpx elk_down
+;                 beq test_down
+
+;                 cpx elk_left
+;                 beq test_left
+
+;                 cpx elk_right
+;                 beq test_right
+
+;                 cpx elk_fire1
+;                 beq test_fire1
+
+;                 cpx elk_fire2
+;                 beq test_fire2
+
+; default:
+;                 ; Forward on to KEYV.
+;                 lda os_x
+;                 ora #$80        ;reinstate bit 7, masked out above
+;                 tax
+;                 lda os_a
+;                 ldy os_y
+;                 jmp jmp_default_keyv.with_p_already_pushed
+
+; test_up:
+;                 and #jup_mask
+;                 beq default
+; pressed:
+;                 lda os_a
+;                 ldx #$ff
+;                 ldy os_y
+;                 rts
+
+; test_down:
+;                 and #jdown_mask
+;                 beq default
+;                 bne pressed
+
+; test_left:
+;                 and #jleft_mask
+;                 beq default
+;                 bne pressed
+
+; test_right:
+;                 and #jright_mask
+;                 beq default
+;                 bne pressed
+
+; test_fire1:
+;                 and #jfire1_mask
+;                 beq default
+;                 bne pressed
+
+; test_fire2:
+;                 and #jfire2_mask
+;                 beq default
+;                 bne pressed
+
+; scan_multiple_keys:
+;                 txa
+;                 pha
+                
+;                 sec
+;                 clv
+;                 jsr jmp_default_keyv
+
+;                 ; Save KEYV result.
+;                 stx os_y
+
+;                 ; Restore old state
+;                 pla
+;                 sta os_x
+
+;                 ; Read joystick flags
+;                 lda elk_jflags
+;                 .error 'todo...'
+                
+                .endproc
+                
+;-------------------------------------------------------------------------
+
+                .endsection
 ;-------------------------------------------------------------------------
                 .section master_only
 ;-------------------------------------------------------------------------
@@ -1065,8 +1591,8 @@ workspace_page=*+1-overlay_master
                 .endblock
 
                 ; Unlikely
-                .cerror size(overlay_master)>128,'overlay too large'
-
+                .cerror size(overlay_master)>128,'Master overlay too large'
+                
 ;-------------------------------------------------------------------------
 ;
 ; OSBYTE/KEYV overlay routine suffix for Master 128
@@ -1114,7 +1640,7 @@ handle_overlay_master:
 
                 jmp handle_osbyte_master
 
-; Entry: A/X/Y/P as per OSBYTE return
+; Entry: A/X/Y/P as per OSBYTE/KEYV return
 ; Stack: [old ROMSEL, return address]
 handle_overlay_exit_master:
                 .cpu '65c02'
@@ -1185,7 +1711,7 @@ handle_keyv_xvector_master: .proc
 ;        IRQs disabled
 ;        Stack: [Input P; appropriate return address]
 
-handle_osbyte_master:
+handle_osbyte_master: .proc
                 ; Don't use the OSBYTE zero page yet - it might be
                 ; KEYV, possibly called from an interrupt context.
                 cmp #keyv_osbyte
@@ -1201,11 +1727,12 @@ handle_osbyte_master:
 
                 cmp #$81
                 beq osbyte_81_master
-osbyte_unhandled:
+unhandled:
                 ldx os_x
                 ldy os_y
                 plp
                 jmp jmp_default_osbyte
+                .endproc
 
 ;-------------------------------------------------------------------------
 ;
@@ -1445,7 +1972,7 @@ osbyte_80_master: .proc
                 ; Bail if not ADVAL.
                 ldx os_x
                 cpx #5
-                bcs osbyte_unhandled
+                bcs handle_osbyte_master.unhandled
                 
                 .cpu '65c02'
                 ; Save old ACCCON. Page in HAZEL. Direct FRED to
@@ -1483,7 +2010,7 @@ default:
                 pla
                 sta acccon
                 lda os_a
-                jmp osbyte_unhandled
+                jmp handle_osbyte_master.unhandled
                 .endproc
 ;-------------------------------------------------------------------------
 ;

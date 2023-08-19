@@ -1,9 +1,11 @@
-# Abbreviations
+#+STARTUP: overview
+
+* Abbreviations
 
 - ADJI :: Advanced Digital Joystick Interface (new cartridge)
 - SJI :: Slogger Joystick Interface (original cartridge)
 
-# Electron Expansion memory usage
+* Electron Expansion memory usage
 
 Note regarding the overlay routine:
 
@@ -55,7 +57,7 @@ info:
 
 ~NUM~ is the joystick interface address.
 
-# ADJI memory usage - Electron
+* ADJI memory usage - Electron
 
 Keep the overlay routine. I'm not very familiar with the Electron but
 Slogger presumably knew it well.
@@ -71,7 +73,7 @@ cartridge occupies two banks, but the ADJI ROM will only use one of
 them, there's an extra bank at `?&F4 EOR1` - but that's a lot of
 hassle during development.
 
-# ADJI memory usage - Master 128
+* ADJI memory usage - Master 128
 
 Multi-load stuff won't do this, but it is typically safe to do ~*TAPE~
 and then overwrite page $D. So the overlay routine will still be
@@ -86,17 +88,151 @@ interrupts disabled, and restore the old value.
 If page $D has been overwritten, the workspace address won't be known,
 so the overlay routine will have to supply this.
 
-# Games tested
+* Redone jmp_default_XXX routines
 
-## StarshipCommand
+Forgot that if there's an IRQ pending, and plp~ re-enables interrupts,
+the instruction after ~plp~ will still run! So this is actually quite
+safe:
+
+#+begin_src 6502-asm
+  plp
+  jmp (os_seiwk)
+#+end_src
+
+
+#+begin_src 6502-asm
+  ;-------------------------------------------------------------------------
+  ; 
+  ; jmp_default_osbyte
+  ;
+  ; ?os_a, ?os_x and ?os_y are known to be available. The first thing
+  ; the default OSBYTE routine will do is overwrite them.
+  ;
+  jmp_default_osbyte: .proc
+		  php             ;P
+  with_p_already_pushed:
+		  pha             ;A P
+		  sty os_y
+		  lda default_vectors_ptr+0
+		  sta os_a
+		  lda default_vectors_ptr+1
+		  sta os_x
+		  ldy #<bytev
+		  lda (os_a),y    ;routine LSB
+		  pha             ;RoutL A P
+		  iny
+		  lda (os_a),y    ;routine MSB
+		  sta os_x
+		  pla             ;A P
+		  sta os_a
+		  pla             ;P
+		  plp             ;
+		  jmp (os_a)
+		  .endproc
+
+  ;-------------------------------------------------------------------------
+  ;
+  ; jmp_default_keyv
+  ;
+  ; This is careful not to step on ?os_a, ?os_x and ?os_y. Might be
+  ; overkill, but it is simplified somewhat as A is known not to be an
+  ; input to KEYV.
+
+  jmp_default_keyv: .proc
+		  php             ;P
+  with_p_already_pushed:
+		  sei
+		  sty os_seia
+		  lda default_vectors_ptr+0
+		  sta os_seiwk+0
+		  lda default_vectors_ptr+1
+		  sta os_seiwk+1
+		  ldy #<keyv
+		  lda (os_seiwk),y
+		  pha             ;RoutL P
+		  iny
+		  lda (os_seiwk),y
+		  stx os_seiwk+0
+		  tsx             ;| RoutL P
+		  ldy $102,x      ;P
+		  sta $102,x      ;| RoutL RoutH
+		  tya
+		  pha             ;P RoutL RoutH
+		  ldx os_seiwk+0
+		  ldy os_seia
+		  rti
+		  .endproc
+#+end_src
+blah.
+* Test programs notes
+
+** ~ADJITEST~ /(BBC only)/
+
+Scans all suitable addresses in page $fc (including ones the ADJI
+doesn't actually occupy), interprets the value read as joystick
+inputs, and shows the results.
+
+White means not pressed.
+
+Red means newly pressed.
+
+Magenta means pressed.
+
+** ~INPTEST~
+
+Some input tests.
+
+*** ~ADVAL~
+
+Prints ~ADVAL~ results.
+
+*** ~KEYBOARD SCAN (SINGLE)~
+
+Prints the results of doing a keyboard poll with OSBYTE $79, X bit 7 set.
+Prints ~1~ against any pressed keys.
+
+The moving ~*~ shows which key is being scanned currently.
+
+*** ~KEYBOARD SCAN (MULTIPLE)~
+
+Prints the results of doing a keyboard scan with OSBYTE $79, X bit 7
+clear. Prints ~1~ against any pressed keys.
+
+~>~ indicates the key to start scanning from. Adjust with cursor up
+and down.
+
+~-~ indicates the excluded key, as stored in location $ee. Adjust with
+cursor left and right.
+
+*** ~INKEY (POLL)~
+
+Prints the results of doing a keyboard poll with OSBYTE $81, Y=$ff.
+Prints ~1~ against any pressed keys.
+
+The moving ~*~ shows which key is being scanned currently.
+
+*** ~INKEY (TIMED)~
+
+Prints the results of doing a keyboard scan with time limit using
+OSBYTE $81, Y bit 7 clear. The timeout is 2 seconds.
+
+The OSBYTE results are printed.
+
+** ~ADVALTEST~
+
+Prints ~ADVAL~ results.
+
+* Games tested
+
+** StarshipCommand
 
 Works OK with extended vectors
 
-## Aviator
+** Aviator
 
 Crashes - looks like it scribbles over page $d!
 
-## Firebug
+** Firebug
 
 Works OK with overlay at &150
 
