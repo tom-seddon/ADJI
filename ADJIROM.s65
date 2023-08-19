@@ -2235,6 +2235,11 @@ jmp_default_vector_routine: .proc
                 sta os_seiwk+0
                 ldy os_seia
                 pla
+
+                ; If PLP re-enables interrupts, the next instruction
+                ; still always executes, even if there's an interrupt
+                ; pending. (PLP's IRQ check comes before the register
+                ; is updated.) So this use of os_seiwk is quite safe.
                 plp
                 jmp (os_seiwk)
                 .endproc
