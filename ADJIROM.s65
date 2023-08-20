@@ -1206,18 +1206,13 @@ keyv_done:
                 plp
                 rts
 
-
-                ; The Electron xvector entry points are simplified, as
-                ; there's no fiddling around to ensure HAZEL is paged
-                ; in.
-                
 bytev_values:
                 .word handle_osbyte_xvector_master
                 .word handle_osbyte_electron.osbyte_xvector_entry
 
 keyv_values:
                 .word handle_keyv_xvector_master
-                .word handle_osbyte_electron.keyv_xvector_entry
+                .word handle_keyv_xvector_electron
                 
                 .endproc
 ;-------------------------------------------------------------------------
@@ -1305,18 +1300,18 @@ handle_overlay_exit_electron:
 ; OSBYTE/KEYV handler for Electron.
 ;
 ; Entry: A, X, Y = OSBYTE/KEYV arguments
+;        Stack = [A P RetL RetH]
 
 handle_osbyte_electron: .proc
                 ; Don't use the OSBYTE zero page yet - this call might
                 ; be KEYV.
-                pla             ;P ExitL ExitH ROMSEL RetL RetH
+                pla             ;P RetL RetH
                 cmp #keyv_osbyte
-                beq is_keyv
+                beq keyv_electron
 
-is_osbyte:
-                plp             ;though not actually important for
-                                ;OSBYTE
 osbyte_xvector_entry:
+                php
+is_osbyte:
                 sta os_a
                 stx os_x
                 sty os_y
@@ -1324,18 +1319,13 @@ osbyte_xvector_entry:
                 cmp #$80
                 beq osbyte_80_electron
 
-                ; cmp #$81
-                ; beq osbyte_81_electron
+                cmp #$81
+                beq osbyte_81_electron
 unhandled:
                 ldx os_x
 unhandled_got_x:
                 ldy os_y
-                jmp jmp_default_osbyte
-
-is_keyv:
-                plp
-keyv_xvector_entry:
-                jmp keyv_electron
+                jmp jmp_default_osbyte.with_p_already_pushed
                 .endproc
 
 ;-------------------------------------------------------------------------
@@ -1344,64 +1334,67 @@ keyv_xvector_entry:
 ;
 ; Entry: A = $81, ?os_a = $81
 ;        ?os_x, ?os_y = OSBYTE $81 entry arguments
+;       Stack = [P RetL RetH]
 
-; osbyte_81_electron: .proc
-;                 ; Skip if jkeys bit not set.
-;                 lda elk_jflags
-;                 and #State.jflags.jkeys_mask
-;                 cmp #1          ;C=1 if set
+osbyte_81_electron: .proc
+                ; Skip if jkeys bit not set.
+                lda elk_jflags
+                and #State.jflags.jkeys_mask
+                cmp #1          ;C=1 if set
 
-;                 ; Defer to default OSBYTE if jkeys off.
-;                 ldx os_x
-;                 lda os_a
-;                 ldy os_y
-;                 bcc jmp_default_osbyte.with_p_already_pushed
+                ; Defer to default OSBYTE if jkeys off.
+                ldx os_x
+                lda os_a
+                ldy os_y
+                bcc jmp_default_osbyte.with_p_already_pushed
 
-;                 ; Go to timeout case if Y<$80
-;                 bpl timeout
+                ; Go to timeout case if Y<$80
+                bpl timeout
 
-;                 ; Call default OSBYTE if Y!=$ff
-;                 cpy #$ff
-;                 bne jmp_default_osbyte.with_p_already_pushed
+                ; Call default OSBYTE if Y!=$ff
+                cpy #$ff
+                bne jmp_default_osbyte.with_p_already_pushed
 
-;                 ; Call default OSBYTE for the X=$00 Y=$FF version
-;                 ; call.
-;                 cpx #0
-;                 beq jmp_default_osbyte.with_p_already_pushed
+                ; Call default OSBYTE for the X=$00 Y=$FF version
+                ; call.
+                cpx #0
+                beq jmp_default_osbyte.with_p_already_pushed
 
-;                 ; Is this one of the jkeys?
-;                 lda os_x
-;                 eor #$ff        ;convert to internal key
+                ; Is this one of the jkeys?
+                lda os_x
+                eor #$ff        ;convert to internal key
 
-;                 ldy #num_actions-1 ;Y=action index
-; poll_key_loop:
-;                 ldx elk_state_offsets+State.action_keys,y
-;                 cmp $200,x
-;                 beq found_key
-;                 dey
-;                 bne poll_key_loop
-; not_found_key:
-;                 lda #$81
-;                 ldy #$ff
-;                 ldx os_x
-;                 jmp jmp_default_osbyte.with_p_already_pushed
+                ldx #num_actions-1 ;X=action index
+poll_key_loop:
+                ldy elk_state_offsets+State.action_keys,x
+                cmp $200,y
+                beq found_key
+                dex
+                bpl poll_key_loop
+not_found_key:
+                lda #$81
+                ldy #$ff
+                ldx os_x
+                jmp jmp_default_osbyte.with_p_already_pushed
 
-; found_key:
-;                 lda elk_jflags
-;                 and #3
-;                 tay
-;                 lda joystick_fred_offsets,y
-;                 tay
-;                 lda $fc00,y
-;                 and joystick_action_masks
-;                 beq not_found_key
+found_key:
+                lda elk_jflags
+                and #3
+                tay
+                lda joystick_fred_offsets,y
+                tay
+                lda $fc00,y
+                and joystick_action_masks,x
+                beq not_found_key
 
-;                 ldx #$ff
-;                 ldy #$ff
-;                 lda #$81
-;                 rts
+                ldx #$ff
+                ldy #$ff
+                lda #$81
+                plp
+                rts
 
-; timeout:
+timeout:
+                jmp jmp_default_osbyte.with_p_already_pushed
 ;                 ; Form negated timeout.
 ;                 txa
 ;                 eor #$ff
@@ -1484,7 +1477,7 @@ keyv_xvector_entry:
 ;                 clc
 ;                 rts
 ;                
-;                .endproc
+               .endproc
 
 ;-------------------------------------------------------------------------
 ;
@@ -1521,19 +1514,28 @@ osbyte_80_electron: .proc
 ;
 ; KEYV handler for Electron.
 ;
-; Entry: A = keyv_osbyte
+; Entry: A = any
 ;        X, Y = KEYV arguments
-keyv_electron: .proc
-                ; php             ;save P
-                ; pla
-                ; pha
-                ; and #%01000001  ;separate C+V
-                ; cmp #%00000001  ;check for C=1 V=0
-                ; beq scan
+;        Stack = [P RetL RetH]
+keyv_electron:
+                plp
+                .fall_through_to handle_keyv_xvector_electron
 
-                ; Forward to default KEYV.
+;-------------------------------------------------------------------------
+;
+; Extended vector KEYV handler for Electron.
+;
+; Entry: A = any
+;        X, Y, P = KEYV arguments
+handle_keyv_xvector_electron:
+                bvs +                  ;eliminate V=1 case
+                bcs keyv_electron_scan ;handle C=1 V=0 case
++
+                jmp jmp_default_keyv
+
+keyv_electron_scan:
+                php
                 jmp jmp_default_keyv.with_p_already_pushed
-
 ; scan:
 ;                 sta os_a
 ;                 sty os_y
@@ -1643,7 +1645,7 @@ keyv_electron: .proc
 ;                 lda elk_jflags
 ;                 .error 'todo...'
                 
-                .endproc
+                ;.endproc
                 
 ;-------------------------------------------------------------------------
 
@@ -2998,7 +3000,7 @@ L9552:
 ; Exit:  A = value
 ;        C=1 if digit was invalid
 ; Preserves: X/Y
-atoi_1_digit:   .block
+atoi_1_digit:   .proc
                 jsr xtoi_1_digit; Convert 1 hex digit to a value
                                 ; Entry: A = ASCII digit
                                 ; Exit:  A = value
@@ -3008,7 +3010,7 @@ atoi_1_digit:   .block
 
 L955C:
                 rts
-                .endblock
+                .endproc
 
 ;-------------------------------------------------------------------------
 
@@ -3017,7 +3019,7 @@ L955C:
 ; Exit:  A = value
 ;        C=1 if digit was invalid
 ; Preserves: X/Y
-xtoi_1_digit:   .block
+xtoi_1_digit:   .proc
                 cmp #'A'
                 bcc L9563
                 sbc #7
@@ -3027,7 +3029,7 @@ L9563:
                 sbc #'0'
                 cmp #$10
                 rts
-                .endblock
+                .endproc
 
 ;-------------------------------------------------------------------------
 ;
@@ -3071,12 +3073,17 @@ nybble:
 ;
 ; Call OSBYTE with X=$00 Y=$FF
 ;
-osbyte_x00_yff:
+osbyte_x00_yff: .proc
                 ldx #0
-osbyte_yff:
+                .fall_through_to osbyte_yff
+                .endproc
+osbyte_yff: .proc
                 ldy #$ff
-jmp_osbyte:
+                .fall_through_to jmp_osbyte
+                .endproc
+jmp_osbyte: .proc
                 jmp osbyte
+                .endproc
                 
 ;-------------------------------------------------------------------------
 ; 
@@ -3086,7 +3093,7 @@ jmp_osbyte:
 ; Exit: C=0 if command found
 ;       X = offset of routine address
 ;           (ready for call_command_table_routine)
-find_command: .block
+find_command: .proc
                 .section find_command_workspace
 fc_table_offset: .fill 1
 fc_string_offset: .fill 1
@@ -3150,7 +3157,7 @@ L9273:
 
 done:
                 rts
-                .endblock
+                .endproc
 
 ;-------------------------------------------------------------------------
 ;
@@ -3172,7 +3179,7 @@ toupper: .proc
 ; Entry: A = char of interest
 ; Exit:  C=0 if alpha, C=1 if not alpha
 
-isalpha:        .block
+isalpha:        .proc
                 pha             ; store char
                 and #$DF        ; convert lower case to upper case
                 cmp #'A'
@@ -3186,7 +3193,7 @@ not_alpha:
 done:
                 pla             ; restore char
                 rts
-                .endblock
+                .endproc
 
 ;-------------------------------------------------------------------------
 ;
