@@ -2429,19 +2429,26 @@ parse_jno: .proc
 verbose_get_key: .proc
                 .section verbose_get_key_workspace
 kindex: .fill 1
-
-; if bit 7 set, waiting for no keys pressed. So 
+num_keys: .fill 1
+                
+; if bit 7 set, waiting for no keys pressed.
 waiting_for_no_keys: .fill 1
                 .endsection
+
+                lda #num_electron_keys
+                jsr is_valid_hw
+                bvc +
+                lda #num_master_keys
++
+                sta num_keys
 
                 sec
 main_loop:
                 ror waiting_for_no_keys
 
-                lda #num_keys-1
-                sta kindex
+                ldx #0
 keys_loop:
-                ldx kindex
+                stx kindex
                 lda key_inkey_numbers_table,x
                 pha             ;save INKEY number
                 ora #$80        ;form true INKEY number
@@ -2453,8 +2460,10 @@ keys_loop:
                 cpx #$ff        ;C=1 if pressed
                 beq pressed     ;taken if pressed
 
-                dec kindex
-                bpl keys_loop
+                ldx kindex
+                inx
+                cpx num_keys
+                bne keys_loop
 
                 ; The end of the table is only reached if no keys
                 ; pressed. So arrange for waiting_for_no_keys to get

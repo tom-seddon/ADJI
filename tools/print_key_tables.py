@@ -11,8 +11,8 @@ import os,os.path,sys,collections
 
 Key=collections.namedtuple('Key','name value_str')
 
+# Common keys.
 keys=[
-    # Common keys.
     Key('A','key_a'),
     Key('B','key_b'),
     Key('C','key_c'),
@@ -67,8 +67,11 @@ keys=[
     Key("SHIFT",'key_shift'),
     Key("CTRL",'key_ctrl'),
     Key("CAPS LOCK",'key_caps_lock'),
-    
-    # BBC B keys
+]
+num_electron_keys=len(keys)
+
+# BBC B keys
+keys+=[
     Key('@','key_at'),
     Key('[','key_left_square_bracket'),
     Key('\\\\','key_backslash'),
@@ -87,8 +90,11 @@ keys=[
     Key("f7",'key_f7'),
     Key("f8",'key_f8'),
     Key("f9",'key_f9'),
-    
-    # Master 128 keys
+]
+num_bbc_keys=len(keys)
+
+# Master 128 keys
+keys+=[
     Key('NUM 0','key_numpad_0'),
     Key('NUM 1','key_numpad_1'),
     Key('NUM 2','key_numpad_2'),
@@ -109,6 +115,7 @@ keys=[
     Key('NUM DELETE','key_numpad_delete'),
     Key('NUM .','key_numpad_stop'),
 ]
+num_master_keys=len(keys)
 
 ##########################################################################
 ##########################################################################
@@ -132,7 +139,9 @@ def main(argv):
         print('FATAL: too many keys',file=sys.stderr)
         sys.exit(1)
 
-    print('num_keys=%d'%len(keys))
+    print('num_bbc_keys=%d'%num_bbc_keys)
+    print('num_master_keys=%d'%num_master_keys)
+    print('num_electron_keys=%d'%num_electron_keys)
 
     # INKEY value in bits 0-6 (must set bit 7 before use).
     #
