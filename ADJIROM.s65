@@ -162,6 +162,7 @@ struct_section: .macro
                 .struct_section cmd_jjoy_workspace
                 .struct_section cmd_jkeys_workspace
                 .struct_section cmd_jsetup_workspace
+                .struct_section cmd_jstate_workspace
                 .endunion
                 
                 .cerror *>$b0,'zp overflow'
@@ -903,28 +904,109 @@ ktest_loop:
 ;-------------------------------------------------------------------------
 
 cmd_jstate: .proc
-                ldx #0
+                .section cmd_jstate_workspace
+index: .fill 1
+                .endsection
+                
+                lda #0
+                sta index
 loop:
                 jsr print_following_string
                 .text '+&',0
 
-                txa
+                lda index
                 jsr print_hex_byte
+
+                lda #' '
+                jsr oswrch
+
+                ldx #$ff
+                lda index
+                cmp #State.action_keys
+                bcc print_name
+                sbc #State.action_keys
+                tax
+print_name:
+                jsr print_joystick_action_name
 
                 jsr print_following_string
                 .text ': &',0
 
-                txa
-                tay
+                ldy index
                 jsr read_state
                 jsr print_hex_byte
+                tax
 
+                lda #' '
+                jsr oswrch
+
+                lda index
+                cmp #State.jflags
+                beq print_jflags
+                cmp #State.action_keys
+                bcc next
+
+                ldy #0
+                txa
+                eor #$7f
+find_key_name:
+                and #$7f
+                cmp key_inkey_numbers_table,y
+                beq char_name_key
+                ora #$80
+                cmp key_inkey_numbers_table,y
+                beq string_name_key
+                iny
+                cpy #num_master_keys
+                bne find_key_name
+
+                lda #'?'
+                jsr oswrch
+
+next:
                 jsr osnewl
-
-                inx
-                cpx #size(State)
+                inc index
+                lda index
+                cmp #size(State)
                 bne loop
                 rts
+
+char_name_key:
+                lda key_names_table,y
+                jsr oswrch
+                jmp next
+
+string_name_key:
+                ldx key_names_table,y
+-
+                lda key_strings_table,x
+                jsr shiftl_oswrch
+                inx
+                bcc -
+                jmp next
+
+print_jflags:
+                jsr print_following_string
+                .text 'jindex=',0
+
+                txa
+                and #State.jflags.jindex_mask
+                jsr print_hex_byte.nybble
+
+                jsr print_following_string
+                .text ' jkeys=',0
+
+                txa
+                and #State.jflags.jkeys_mask
+                jsr print_bool
+
+                jsr print_following_string
+                .text ' jjoy=',0
+                txa
+                and #State.jflags.jjoy_mask
+                jsr print_bool
+                jmp next
+                
                 .endproc
                 
 ;-------------------------------------------------------------------------
@@ -2947,6 +3029,18 @@ L9563:
                 rts
                 .endblock
 
+;-------------------------------------------------------------------------
+;
+print_bool: .proc
+                cmp #1
+                .fall_through_to print_c
+                .endproc
+print_c: .proc
+                lda #'0'
+                adc #0
+                jmp oswrch
+                .endproc
+                
 ;-------------------------------------------------------------------------
 ;
 ;
