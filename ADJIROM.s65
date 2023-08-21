@@ -358,130 +358,133 @@ xo=*-questions_table
 
 ;-------------------------------------------------------------------------
 
-; direct from the Slogger expansion ROM...
-electron_key_chars_table:
-                .byte $00       ;0
-                .byte $00       ;1
-                .byte $00       ;2
-                .byte $00       ;3
-                .byte $00       ;4
-                .byte $00       ;5
-                .byte $00       ;6
-                .byte $00       ;7
-                .byte $00       ;8
-                .byte $00       ;9
-                .byte $00       ;10
-                .byte $00       ;11
-                .byte $00       ;12
-                .byte $00       ;13
-                .byte $00       ;14
-                .byte $00       ;15
-                .byte 'Q'       ;16
-                .byte '3'       ;17
-                .byte '4'       ;18
-                .byte '5'       ;19
-                .byte $00       ;20
-                .byte '8'       ;21
-                .byte $00       ;22
-                .byte '-'       ;23
-                .byte $00       ;24
-                .byte $00       ;25
-                .byte $00       ;26
-                .byte $00       ;27
-                .byte $00       ;28
-                .byte $00       ;29
-                .byte $00       ;30
-                .byte $00       ;31
-                .byte $00       ;32
-                .byte 'W'       ;33
-                .byte 'E'       ;34
-                .byte 'T'       ;35
-                .byte '7'       ;36
-                .byte '9'       ;37
-                .byte 'I'       ;38
-                .byte '0'       ;39
-                .byte '_'       ;40
-                .byte $00       ;41
-                .byte $00       ;42
-                .byte $00       ;43
-                .byte $00       ;44
-                .byte $00       ;45
-                .byte $00       ;46
-                .byte $00       ;47
-                .byte '1'       ;48
-                .byte '2'       ;49
-                .byte 'D'       ;50
-                .byte 'R'       ;51
-                .byte '6'       ;52
-                .byte 'U'       ;53
-                .byte 'O'       ;54
-                .byte 'P'       ;55
-                .byte $00       ;56
-                .byte $00       ;57
-                .byte $00       ;58
-                .byte $00       ;59
-                .byte $00       ;60
-                .byte $00       ;61
-                .byte $00       ;62
-                .byte $00       ;63
-                .byte $00       ;64
-                .byte 'A'       ;65
-                .byte 'X'       ;66
-                .byte 'F'       ;67
-                .byte 'Y'       ;68
-                .byte 'J'       ;69
-                .byte 'K'       ;70
-                .byte '@'       ;71
-                .byte ':'       ;72
-                .byte 13        ;73
-                .byte $00       ;74
-                .byte $00       ;75
-                .byte $00       ;76
-                .byte $00       ;77
-                .byte $00       ;78
-                .byte $00       ;79
-                .byte $00       ;80
-                .byte 'S'       ;81
-                .byte 'C'       ;82
-                .byte 'G'       ;83
-                .byte 'H'       ;84
-                .byte 'N'       ;85
-                .byte 'L'       ;86
-                .byte ';'       ;87
-                .byte $00       ;88
-                .byte 127       ;89
-                .byte $00       ;90
-                .byte $00       ;91
-                .byte $00       ;92
-                .byte $00       ;93
-                .byte $00       ;94
-                .byte $00       ;95
-                .byte $00       ;96
-                .byte 'Z'       ;97
-                .byte ' '       ;98
-                .byte 'V'       ;99
-                .byte 'B'       ;100
-                .byte 'M'       ;101
-                .byte ','       ;102
-                .byte '.'       ;103
-                .byte '/'       ;104
-                .byte $00       ;105
-                .byte $00       ;106
-                .byte $00       ;107
-                .byte $00       ;108
-                .byte $00       ;109
-                .byte $00       ;110
-                .byte $00       ;111
-                .byte $1b       ;112
-                .byte $00       ;113
-                .byte $00       ;114
-                .byte $00       ;115
-                .byte $00       ;116
-                .byte $00       ;117
-                .byte $00       ;118
-                .byte $00       ;119
-                .byte '\\'      ;120
-                .byte $00       ;121
+; copied from MOS 3.20
+key_chars_table:
+                .text "Q"                    ;10 q
+                .byte "3"                    ;11 3
+                .byte "4"                    ;12 4
+                .byte "5"                    ;13 5
+                .byte $84                    ;14 f4
+                .text "8"                    ;15 8
+                .byte $87                    ;16 f7
+                .text "-"                    ;17 minus
+                .text "^"                    ;18 caret
+                .byte $8C                    ;19 left
+                .byte "6"|$80                ;1a numpad_6
+                .byte "7"|$80                ;1b numpad_7
+                nop
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=16,'oops'
+
+                .byte $80                    ;20 f0
+                .text "W"                    ;21 w
+                .text "E"                    ;22 e 
+                .text "T"                    ;23 t
+                .text "7"                    ;24 7
+                .text "I"                    ;25 i
+                .text "9"                    ;26 9
+                .text "0"                    ;27 0
+                .text "_"                    ;28 underline
+                .byte $8E                    ;29 down
+                .byte "8"|$80                ;2a numpad_8
+                .byte "9"|$80                ;2b numpad_9
+                nop
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=32,'oops'
+
+                .text "1"                    ;30 1
+                .text "2"                    ;31 2
+                .text "R"                    ;33 r
+                .text "6"                    ;34 6
+                .text "D"                    ;32 d
+                .text "U"                    ;35 u
+                .text "O"                    ;36 o
+                .text "P"                    ;37 p
+                .text "["                    ;38 left_square_bracket
+                .byte $8F                    ;39 up
+                .byte "+"                    ;3a numpad_plus
+                .byte "-"                    ;3b numpad_minus
+                .byte $0d                    ;3c numpad_return
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=48,'oops'
+                
+                .byte 1                      ;40 caps_lock
+                .text "A"                    ;41 a
+                .text "X"                    ;42 x
+                .text "F"                    ;43 f
+                .text "Y"                    ;44 y
+                .text "J"                    ;45 j
+                .text "K"                    ;46 k
+                .text "@"                    ;47 at
+                .text ":"                    ;48 colon
+                .byte $0D                    ;49 return
+                .byte "/"                    ;4a numpad_divide
+                .byte 127                    ;4b numpad_delete
+                .byte "."                    ;4c numpad_stop
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=64,'oops'
+
+                .byte 2                      ;50 shift_lock
+                .text "S"                    ;51 s
+                .text "C"                    ;52 c
+                .text "G"                    ;53 g
+                .text "H"                    ;54 h
+                .text "N"                    ;55 n
+                .text "L"                    ;56 l
+                .text ";"                    ;57 semicolon
+                .text "]"                    ;58 right_square_bracket
+                .byte $7F                    ;59 delete
+                .byte "#"                    ;5a numpad_hash
+                .byte "*"                    ;5b numpad_multiply
+                .byte ","                    ;5c numpad_comma
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=80,'oops'
+
+                .byte 0                      ;60 tab
+                .text "Z"                    ;61 z
+                .text " "                    ;62 space
+                .text "V"                    ;63 v
+                .text "B"                    ;64 b
+                .text "M"                    ;65 m
+                .text ","                    ;66 comma
+                .text "."                    ;67 stop
+                .text "/"                    ;68 divide
+                .byte $8B                    ;69 copy
+                .byte "0"                    ;6a numpad_0
+                .byte "1"                    ;6b numpad_1
+                .byte "3"                    ;6c numpad_3
+                .byte 0                      ;6d
+                .byte 0                      ;6e
+                .byte 0                      ;6f
+                .cerror *-key_chars_table!=96,'oops'
+
+                .byte 27                     ;70 escape
+                .byte $81                    ;71 f1
+                .byte $82                    ;72 f2
+                .byte $83                    ;73 f3
+                .byte $85                    ;74 f5
+                .byte $86                    ;75 f6
+                .byte $88                    ;76 f8
+                .byte $89                    ;77 f9
+                .byte $5C                    ;78 backslash
+                .byte $8D                    ;79 right
+                .byte "4"                    ;7a numpad_4
+                .byte "5"                    ;7b numpad_5
+                .byte "2"                    ;7c numpad_2
+                nop
+                nop
+                nop
+                .cerror *-key_chars_table!=112,'oops'
 
 ;-------------------------------------------------------------------------
                 .endsection tables
@@ -1581,8 +1584,11 @@ kkey_pressed:
                 rts
 
 jkey_pressed:
-                ldx electron_key_chars_table,y ;X=ASCII value of key pressed
-                beq try_osbyte                 ;bail if not ASCII
+                cpy #16
+                bcc try_osbyte        ;definitely not ASCII
+                lda key_chars_table-16,y ;X=ASCII value of key pressed
+                bmi try_osbyte        ;bail if not ASCII
+                beq try_osbyte        ;bail if TAB
                 
                 ldx os_auto_repeat_countdown
                 beq reset_auto_repeat_countdown
@@ -1592,7 +1598,7 @@ reset_auto_repeat_countdown:
                 ldx os_auto_repeat_period
                 stx os_auto_repeat_countdown
 
-                ldx electron_key_chars_table,y ;X=ASCII value of key pressed
+                tax                   ;X=ASCII value of key pressed
                 lda os_a
                 ldy #0
                 clc
