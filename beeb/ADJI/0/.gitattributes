@@ -4,3 +4,4 @@ $.ADVALTEST diff=bbcbasic
 $.JKTEST diff=bbcbasic
 $.YBIT diff=bbcbasic
 $.INPTEST diff=bbcbasic
+$.FINDINMOS diff=bbcbasic

@@ -222,70 +222,110 @@ The OSBYTE results are printed.
 
 Prints ~ADVAL~ results.
 
-* Key numbers
+* Electron key stuff
 
-| Key          | IntH | InkH | INKEY |
-|--------------+------+------+-------|
-| A            |   41 | be   |   -66 |
-| B            |   64 | 9b   |  -101 |
-| C            |   52 | ad   |   -83 |
-| D            |   32 | cd   |   -51 |
-| E            |   22 | dd   |   -35 |
-| F            |   43 | bc   |   -68 |
-| G            |   53 | ac   |   -84 |
-| H            |   54 | ab   |   -85 |
-| I            |   25 | da   |   -38 |
-| J            |   45 | ba   |   -70 |
-| K            |   46 | b9   |   -71 |
-| L            |   56 | a9   |   -87 |
-| M            |   65 | 9a   |  -102 |
-| N            |   55 | aa   |   -86 |
-| O            |   36 | c9   |   -55 |
-| P            |   37 | c8   |   -56 |
-| Q            |   10 | ef   |   -17 |
-| R            |   33 | cc   |   -52 |
-| S            |   51 | ae   |   -82 |
-| T            |   23 | dc   |   -36 |
-| U            |   35 | ca   |   -54 |
-| V            |   63 | 9c   |  -100 |
-| W            |   21 | de   |   -34 |
-| X            |   42 | bd   |   -67 |
-| Y            |   44 | bb   |   -69 |
-| Z            |   61 | 9e   |   -98 |
-| 0            |   27 | d8   |   -40 |
-| 1            |   30 | cf   |   -49 |
-| 2            |   31 | ce   |   -50 |
-| 3            |   11 | ee   |   -18 |
-| 4            |   12 | ed   |   -19 |
-| 5            |   13 | ec   |   -20 |
-| 6            |   34 | cb   |   -53 |
-| 7            |   24 | db   |   -37 |
-| 8            |   15 | ea   |   -22 |
-| 9            |   26 | d9   |   -39 |
-| -            |   17 | e8   |   -24 |
-| ;            |   57 | a8   |   -88 |
-| :            |   48 | b7   |   -73 |
-| ,            |   66 | 99   |  -103 |
-| .            |   67 | 98   |  -104 |
-| /            |   68 | 97   |  -105 |
-| SPACE        |   62 | 9d   |   -99 |
-| ESCAPE       |   70 | 8f   |  -113 |
-| DELETE       |   59 | a6   |   -90 |
-| RETURN       |   49 | b6   |   -74 |
-| CURSOR UP    |   39 | c6   |   -58 |
-| CURSOR DOWN  |   29 | d6   |   -42 |
-| CURSOR LEFT  |   19 | e6   |   -26 |
-| CURSOR RIGHT |   79 | 86   |  -122 |
-| COPY         |   69 | 96   |  -106 |
-| SHIFT        |   00 | ff   |    -1 |
-| CTRL         |   01 | fe   |    -2 |
-| CAPS LOCK    |   40 | bf   |   -65 |
-|              |      |      |       |
+Keyboard translation table: $edd3 - indexed by ULA hardware key number
+rather than internal key number though...
+
+ULA hardware key number appears to be as per EAUG p225
+
+| Column | Address | Index |   |  Bit 0 | Bit 1   | Bit 2  | Bit 3  |
+|--------+---------+-------+---+--------+---------+--------+--------|
+|      0 | &BFFE   |    00 |   |  Right | Copy    | NC     | Space  |
+|      1 | &BFFD   |    04 |   |   Left | Down    | Return | Delete |
+|      2 | &BFFB   |    08 |   |      - | Up      | :      | NC     |
+|      3 | &BFF7   |    0c |   |      0 | P       | ;      | /      |
+|      4 | &BFEF   |    10 |   |      9 | O       | L      | .      |
+|      5 | &BFDF   |    14 |   |      8 | I       | K      | ,      |
+|      6 | &BFBF   |    18 |   |      7 | U       | J      | M      |
+|      7 | &BF7F   |    1c |   |      6 | Y       | H      | N      |
+|      8 | &BEFF   |    20 |   |      5 | T       | G      | B      |
+|      9 | &BDFF   |    24 |   |      4 | R       | F      | V      |
+|      A | &BBFF   |    28 |   |      3 | E       | D      | C      |
+|      B | &B7FF   |    2c |   |      2 | W       | S      | X      |
+|      C | &AFFF   |    30 |   |      1 | Q       | A      | Z      |
+|      D | &9FFF   |    34 |   | Escape | Caps Lk | Ctrl   | Shift  |
+
+$ee40 maps INKEY number to hardware key number.
+
+
+| Key          | IntH | InkH | INKEY | Electron |
+|--------------+------+------+-------+----------|
+| A            |   41 | be   |   -66 |       32 |
+| B            |   64 | 9b   |  -101 |       23 |
+| C            |   52 | ad   |   -83 |       2b |
+| D            |   32 | cd   |   -51 |       2a |
+| E            |   22 | dd   |   -35 |       29 |
+| F            |   43 | bc   |   -68 |       26 |
+| G            |   53 | ac   |   -84 |       22 |
+| H            |   54 | ab   |   -85 |       1e |
+| I            |   25 | da   |   -38 |       15 |
+| J            |   45 | ba   |   -70 |       1a |
+| K            |   46 | b9   |   -71 |       16 |
+| L            |   56 | a9   |   -87 |       12 |
+| M            |   65 | 9a   |  -102 |       1b |
+| N            |   55 | aa   |   -86 |       1f |
+| O            |   36 | c9   |   -55 |       11 |
+| P            |   37 | c8   |   -56 |       0d |
+| Q            |   10 | ef   |   -17 |       31 |
+| R            |   33 | cc   |   -52 |       25 |
+| S            |   51 | ae   |   -82 |       2e |
+| T            |   23 | dc   |   -36 |       22 |
+| U            |   35 | ca   |   -54 |       19 |
+| V            |   63 | 9c   |  -100 |       27 |
+| W            |   21 | de   |   -34 |       2d |
+| X            |   42 | bd   |   -67 |       2f |
+| Y            |   44 | bb   |   -69 |       1d |
+| Z            |   61 | 9e   |   -98 |       33 |
+| 0            |   27 | d8   |   -40 |       0c |
+| 1            |   30 | cf   |   -49 |       30 |
+| 2            |   31 | ce   |   -50 |       2c |
+| 3            |   11 | ee   |   -18 |       28 |
+| 4            |   12 | ed   |   -19 |       24 |
+| 5            |   13 | ec   |   -20 |       20 |
+| 6            |   34 | cb   |   -53 |       1c |
+| 7            |   24 | db   |   -37 |       18 |
+| 8            |   15 | ea   |   -22 |       14 |
+| 9            |   26 | d9   |   -39 |       10 |
+| -            |   17 | e8   |   -24 |       08 |
+| ;            |   57 | a8   |   -88 |       0e |
+| :            |   48 | b7   |   -73 |       0a |
+| ,            |   66 | 99   |  -103 |       17 |
+| .            |   67 | 98   |  -104 |       13 |
+| /            |   68 | 97   |  -105 |       0f |
+| SPACE        |   62 | 9d   |   -99 |       03 |
+| ESCAPE       |   70 | 8f   |  -113 |       34 |
+| DELETE       |   59 | a6   |   -90 |       07 |
+| RETURN       |   49 | b6   |   -74 |       06 |
+| CURSOR UP    |   39 | c6   |   -58 |       09 |
+| CURSOR DOWN  |   29 | d6   |   -42 |       05 |
+| CURSOR LEFT  |   19 | e6   |   -26 |       04 |
+| CURSOR RIGHT |   79 | 86   |  -122 |       00 |
+| COPY         |   69 | 96   |  -106 |       01 |
+| SHIFT        |   00 | ff   |    -1 |       37 |
+| CTRL         |   01 | fe   |    -2 |       36 |
+| CAPS LOCK    |   40 | bf   |   -65 |       34 |
 
 
 | Int | Int | INKEY | Key |
 |-----+-----+-------+-----|
 |     |     |       |     |
+
+* 16-bit decrement
+
+Tidy code from MOS 3.20, which would also work well for time in X/Y.
+
+#+begin_src 6502-asm
+  intervalTimerDone:
+		  lda inkeyTimeoutCounter+0
+		  bne LE715
+		  lda inkeyTimeoutCounter+1
+		  beq LE718
+		  dec inkeyTimeoutCounter+1
+  LE715:
+		  dec inkeyTimeoutCounter+0
+  LE718:
+#+end_src
 
 * Games tested
 

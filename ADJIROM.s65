@@ -355,7 +355,134 @@ xo=*-questions_table
                 .shiftl "Xvector/Overlay"
                 .shiftl "X/O"
                 .endproc
-                
+
+;-------------------------------------------------------------------------
+
+; direct from the Slogger expansion ROM...
+electron_key_chars_table:
+                .byte $00       ;0
+                .byte $00       ;1
+                .byte $00       ;2
+                .byte $00       ;3
+                .byte $00       ;4
+                .byte $00       ;5
+                .byte $00       ;6
+                .byte $00       ;7
+                .byte $00       ;8
+                .byte $00       ;9
+                .byte $00       ;10
+                .byte $00       ;11
+                .byte $00       ;12
+                .byte $00       ;13
+                .byte $00       ;14
+                .byte $00       ;15
+                .byte 'Q'       ;16
+                .byte '3'       ;17
+                .byte '4'       ;18
+                .byte '5'       ;19
+                .byte $00       ;20
+                .byte '8'       ;21
+                .byte $00       ;22
+                .byte '-'       ;23
+                .byte $00       ;24
+                .byte $00       ;25
+                .byte $00       ;26
+                .byte $00       ;27
+                .byte $00       ;28
+                .byte $00       ;29
+                .byte $00       ;30
+                .byte $00       ;31
+                .byte $00       ;32
+                .byte 'W'       ;33
+                .byte 'E'       ;34
+                .byte 'T'       ;35
+                .byte '7'       ;36
+                .byte '9'       ;37
+                .byte 'I'       ;38
+                .byte '0'       ;39
+                .byte '_'       ;40
+                .byte $00       ;41
+                .byte $00       ;42
+                .byte $00       ;43
+                .byte $00       ;44
+                .byte $00       ;45
+                .byte $00       ;46
+                .byte $00       ;47
+                .byte '1'       ;48
+                .byte '2'       ;49
+                .byte 'D'       ;50
+                .byte 'R'       ;51
+                .byte '6'       ;52
+                .byte 'U'       ;53
+                .byte 'O'       ;54
+                .byte 'P'       ;55
+                .byte $00       ;56
+                .byte $00       ;57
+                .byte $00       ;58
+                .byte $00       ;59
+                .byte $00       ;60
+                .byte $00       ;61
+                .byte $00       ;62
+                .byte $00       ;63
+                .byte $00       ;64
+                .byte 'A'       ;65
+                .byte 'X'       ;66
+                .byte 'F'       ;67
+                .byte 'Y'       ;68
+                .byte 'J'       ;69
+                .byte 'K'       ;70
+                .byte '@'       ;71
+                .byte ':'       ;72
+                .byte 13        ;73
+                .byte $00       ;74
+                .byte $00       ;75
+                .byte $00       ;76
+                .byte $00       ;77
+                .byte $00       ;78
+                .byte $00       ;79
+                .byte $00       ;80
+                .byte 'S'       ;81
+                .byte 'C'       ;82
+                .byte 'G'       ;83
+                .byte 'H'       ;84
+                .byte 'N'       ;85
+                .byte 'L'       ;86
+                .byte ';'       ;87
+                .byte $00       ;88
+                .byte 127       ;89
+                .byte $00       ;90
+                .byte $00       ;91
+                .byte $00       ;92
+                .byte $00       ;93
+                .byte $00       ;94
+                .byte $00       ;95
+                .byte $00       ;96
+                .byte 'Z'       ;97
+                .byte ' '       ;98
+                .byte 'V'       ;99
+                .byte 'B'       ;100
+                .byte 'M'       ;101
+                .byte ','       ;102
+                .byte '.'       ;103
+                .byte '/'       ;104
+                .byte $00       ;105
+                .byte $00       ;106
+                .byte $00       ;107
+                .byte $00       ;108
+                .byte $00       ;109
+                .byte $00       ;110
+                .byte $00       ;111
+                .byte $1b       ;112
+                .byte $00       ;113
+                .byte $00       ;114
+                .byte $00       ;115
+                .byte $00       ;116
+                .byte $00       ;117
+                .byte $00       ;118
+                .byte $00       ;119
+                .byte '\\'      ;120
+                .byte $00       ;121
+
 ;-------------------------------------------------------------------------
                 .endsection tables
 ;-------------------------------------------------------------------------
@@ -1394,89 +1521,83 @@ found_key:
                 rts
 
 timeout:
-                jmp jmp_default_osbyte.with_p_already_pushed
-;                 ; Form negated timeout.
-;                 txa
-;                 eor #$ff
-;                 sta elk_osbyte_81_timeout+0
-;                 tya
-;                 eor #$ff
-;                 sta elk_osbyte_81_timeout+1
-; loop:
-;                 ; Read joystick
-;                 lda elk_jflags
-;                 and #3
-;                 tax
-;                 lda $fc00,x
-;                 and #jall_mask
-;                 beq try_osbyte  ;taken if obviously nothing pressed
+                plp
+                
+                ; Form timeout.
+                stx elk_osbyte_81_timeout+0
+                sty elk_osbyte_81_timeout+1
+loop:
+                ; Read joystick
+                lda elk_jflags
+                and #3
+                tay
+                ldx joystick_fred_offsets,y
+                lda $fc00,x
+                and #jall_mask
+                beq try_osbyte  ;taken if obviously nothing pressed
 
-;                 ; Find state offset for action.
-;                 ldy #State.action_keys-1
-; find_index_loop:
-;                 iny
-;                 lsr a
-;                 bcc find_index_loop
+                ; Find state offset for action.
+                ldy #State.action_keys-1
+find_index_loop:
+                iny
+                lsr a
+                bcc find_index_loop
 
-;                 ldx elk_state_offsets,y
-;                 bpl jkey_pressed
+                ldx elk_state_offsets,y
+                ldy $200,x
+                bpl jkey_pressed
 
-; try_osbyte:
-;                 ldy #0
-;                 ldx #1
-;                 lda #$81
-;                 jsr jmp_default_osbyte
-;                 cpy #$ff
-;                 bne kkey_pressed
+try_osbyte:
+                ; assume remaining timeout >0
+                ldy #0
+                ldx #1
+                lda elk_osbyte_81_timeout+0
+                ora elk_osbyte_81_timeout+1
+                bne call_osbyte_81
+                dex             ;X=0,Y=0
+call_osbyte_81:
+                lda #$81
+                jsr jmp_default_osbyte
+                cpy #$ff
+                bne kkey_pressed
 
-; next:
-;                 inc elk_osbyte_81_timeout+0
-;                 bne loop
-;                 inc elk_osbyte_81_timeout+1
-;                 bne loop
+next:
+                lda elk_osbyte_81_timeout+0
+                bne no_carry
+                lda elk_osbyte_81_timeout+1
+                beq timed_out
+                dec elk_osbyte_81_timeout+1
+no_carry:
+                dec elk_osbyte_81_timeout+0
+                jmp loop
 
-;                 ; Timed out. Return with C=1 and Y=$ff
-;                 ldy #$ff
-;                 sec
-;                 rts
+timed_out:
+                ; Timed out. Return with C=1 and Y=$ff
+                ldy #$ff
+                sec
+                rts
 
-; kkey_pressed:
-;                 rts
+kkey_pressed:
+                rts
 
-; jkey_pressed:
-;                 ldx os_auto_repeat_countdown
-;                 beq reset_auto_repeat_countdown
-;                 dec os_auto_repeat_countdown
-;                 bne try_osbyte
-; reset_auto_repeat_countdown:
-;                 ldx os_auto_repeat_period
-;                 stx os_auto_repeat_countdown
+jkey_pressed:
+                ldx electron_key_chars_table,y ;X=ASCII value of key pressed
+                beq try_osbyte                 ;bail if not ASCII
+                
+                ldx os_auto_repeat_countdown
+                beq reset_auto_repeat_countdown
+                dec os_auto_repeat_countdown
+                bne try_osbyte
+reset_auto_repeat_countdown:
+                ldx os_auto_repeat_period
+                stx os_auto_repeat_countdown
 
-;                 php             ;save old IRQ status
-;                 pha             ; save internal key number
-
-;                 lda #$ac        ;Keyboard translation table address
-;                 jsr osbyte_x00_yff
-;                 sei
-;                 stx os_seiwk+0
-;                 sty os_seiwk+1
-;                 pla             ;restore internal key number
-;                 tay             ;Y=internal key number
-;                 lda (os_seiwk),y
-;                 bne +           ;taken if not TAB
-;                 lda os_tab_key_code
-; +
-;                 ; The Slogger ROM doesn't handle shift, ctrl, caps
-;                 ; lock, etc., so this one doesn't either.
-;                 jsr toupper
-
-;                 tax             ;X=ASCII value of key pressed
-;                 plp             ;restore old IRQ state
-;                 lda os_a
-;                 ldy #0
-;                 clc
-;                 rts
-;                
+                ldx electron_key_chars_table,y ;X=ASCII value of key pressed
+                lda os_a
+                ldy #0
+                clc
+                rts
+               
                .endproc
 
 ;-------------------------------------------------------------------------
