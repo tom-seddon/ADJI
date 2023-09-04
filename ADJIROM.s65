@@ -290,7 +290,6 @@ bad_jno_offset: .error_table_entry $dc,'Bad joystick'
 no_free_hazel: .error_table_entry $ff,'No free FS RAM'
 bad_mode: .error_table_entry $ff,'Bad mode'
 todo_offset: .error_table_entry $ff,'TODO'
-electron_todo_offset: .error_table_entry $ff,'Electron = TODO'
 unexpected_os: .error_table_entry $ff,'Unexpected Electron OS'
                 .endblock
                 
@@ -333,14 +332,6 @@ elk_state_offsets: .proc
                 
 joystick_fred_offsets:
                 .byte $c0,$d0,$e0,$f0
-
-joystick_action_masks:
-                .byte 1
-                .byte 2
-                .byte 4
-                .byte 8
-                .byte 16
-                .byte 32
 
 ;-------------------------------------------------------------------------
 
@@ -643,6 +634,8 @@ done:
 ;-------------------------------------------------------------------------
                 .section star
 ;-------------------------------------------------------------------------
+
+; TODO could live in keyboard table
 cmd_joff:
                 jsr reset_default_vectors
                 rts
@@ -736,6 +729,7 @@ jno: .fill 1
 jkeys: .fill 1
 use_overlay: .fill 1
 action_index: .fill 1
+                
                 .endsection
 
                 jsr reset_default_vectors
@@ -1514,7 +1508,7 @@ found_key:
                 lda joystick_fred_offsets,y
                 tay
                 lda $fc00,y
-                and joystick_action_masks,x
+                and joystick_actions.masks,x
                 beq not_found_key
 
                 ldx #$ff
@@ -1654,125 +1648,133 @@ keyv_electron:
 ;
 ; Entry: A = any
 ;        X, Y, P = KEYV arguments
-handle_keyv_xvector_electron:
-                bvs +                  ;eliminate V=1 case
-                bcs keyv_electron_scan ;handle C=1 V=0 case
-+
-                jmp jmp_default_keyv
-
-keyv_electron_scan:
+handle_keyv_xvector_electron: .proc
                 php
+                bvs +                  ;eliminate V=1 case
+                bcs escan               ;handle C=1 V=0 case
++
                 jmp jmp_default_keyv.with_p_already_pushed
-; scan:
-;                 sta os_a
-;                 sty os_y
 
-;                 lda elk_jflags
-;                 and #State.jflags.jkeys_mask
-;                 beq jmp_default_keyv.with_p_already_pushed
+escan:
+                txa
+                bpl escan_multiple_keys
 
-;                 ; Check for keyboard scan mode.
-;                 txa
-;                 bpl scan_multiple_keys
-
-; scan_single_key:
-;                 ; Convert to internal key number.
-;                 and #$7f
-;                 sta os_x
-
-;                 ; Read joystick flags.
-;                 lda elk_jflags
-;                 and #State.jflags.jkeys_mask
-;                 beq default
-;                 lda elk_jflags
-;                 and #3
-;                 tax
-;                 ldy joystick_fred_offsets,x
-;                 lda $fc00,y
-
-;                 ldx os_x        ;key of interest
+                sei
                 
-;                 cpx elk_up
-;                 beq test_up
+                and #$7f        ;internal key number
+                sta os_seiwk+0
 
-;                 cpx elk_down
-;                 beq test_down
+                lda elk_jflags
+                and #State.jflags.jindex_mask
+                tay
+                ldx joystick_fred_offsets,y
+                ldy $fc00,x
 
-;                 cpx elk_left
-;                 beq test_left
+                ldx os_seiwk+0  ;internal key number
 
-;                 cpx elk_right
-;                 beq test_right
+test_up:
+                cpx elk_up
+                bne test_down
+                tya
+                and #jup_mask
+                bne pressed
 
-;                 cpx elk_fire1
-;                 beq test_fire1
+test_down:
+                cpx elk_down
+                bne test_left
+                tya
+                and #jdown_mask
+                bne pressed
 
-;                 cpx elk_fire2
-;                 beq test_fire2
+test_left:
+                cpx elk_left
+                bne test_right
+                tya
+                and #jleft_mask
+                bne pressed
 
-; default:
-;                 ; Forward on to KEYV.
-;                 lda os_x
-;                 ora #$80        ;reinstate bit 7, masked out above
-;                 tax
-;                 lda os_a
-;                 ldy os_y
-;                 jmp jmp_default_keyv.with_p_already_pushed
+test_right:
+                cpx elk_right
+                bne test_fire1
+                tya
+                and #jright_mask
+                bne pressed
 
-; test_up:
-;                 and #jup_mask
-;                 beq default
-; pressed:
-;                 lda os_a
-;                 ldx #$ff
-;                 ldy os_y
-;                 rts
+test_fire1:
+                cpx elk_fire1
+                bne test_fire2
+                tya
+                and #jfire1_mask
+                bne pressed
 
-; test_down:
-;                 and #jdown_mask
-;                 beq default
-;                 bne pressed
+test_fire2:
+                cpx elk_fire2
+                bne pass_to_keyv
+                tya
+                and #jfire2_mask
+                bne pressed
 
-; test_left:
-;                 and #jleft_mask
-;                 beq default
-;                 bne pressed
-
-; test_right:
-;                 and #jright_mask
-;                 beq default
-;                 bne pressed
-
-; test_fire1:
-;                 and #jfire1_mask
-;                 beq default
-;                 bne pressed
-
-; test_fire2:
-;                 and #jfire2_mask
-;                 beq default
-;                 bne pressed
-
-; scan_multiple_keys:
-;                 txa
-;                 pha
+pass_to_keyv:
+                lda os_seiwk+0  ;internal key number
+                ora #$80        ;reinstate bit 7, masked out above
+                tax
+                jmp jmp_default_keyv.with_p_already_pushed
                 
-;                 sec
-;                 clv
-;                 jsr jmp_default_keyv
+pressed:
+                ldx #$ff
+                txa
+                plp
+                rts
 
-;                 ; Save KEYV result.
-;                 stx os_y
+escan_multiple_keys:
+                txa
+                pha
+                sec
+                clv
+                jsr jmp_default_keyv
 
-;                 ; Restore old state
-;                 pla
-;                 sta os_x
+                sei
 
-;                 ; Read joystick flags
-;                 lda elk_jflags
-;                 .error 'todo...'
+                ; Save KEYV input - min key.
+                pla
+                sta os_seiwk+0
                 
-                ;.endproc
+                ; Save KEYV result - max key.
+                stx os_seiwk+1
+
+                lda elk_jflags
+                and #State.jflags.jindex_mask
+                tay
+                ldx joystick_fred_offsets,y
+                lda $fc00,x
+                sta os_seia     ;joystick state
+
+                ldx #num_actions-1
+loop:
+                lda os_seia     ;joystick state
+                and joystick_actions.masks,x
+                beq next        ;taken if not pressed
+
+                lda elk_state_offsets+State.action_keys,x
+                tay
+                lda $200,y
+                cmp os_seiwk+0  ;within scan range?
+                bcc next        ;taken if not
+                beq next        ;taken if not
+                cmp os_seiwk+1  ;existing result covers it?
+                bcs next        ;taken if so
+                
+                sta os_seiwk+1
+
+next:
+                dex
+                bpl loop
+
+                ldx os_seiwk+1
+                txa
+                plp
+                rts
+                .endproc
                 
 ;-------------------------------------------------------------------------
 
@@ -3431,9 +3433,9 @@ cset_loop:
                 rts
                 
 cset_vdu:
-con_vdu:
+con_vdu:                        ;TODO could live in keyboard table
                 .byte 23,1,1
-coff_vdu:
+coff_vdu:                       ;TODO could live in keyboard table
                 .byte 23,1,0
                 ; doens't matter what comes next...
                 
