@@ -45,6 +45,8 @@ build:
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) stat --size-budget 4096 "$(BUILD)/ADJIROM.bin"
 	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM_debug.bin"
+	$(_V)$(SHELLCMD) blank-line
+	$(_V)$(SHELLCMD) sha1 "$(BUILD)/ADJIROM.bin"
 
 ##########################################################################
 ##########################################################################
