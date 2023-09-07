@@ -2035,26 +2035,19 @@ found_key:
                 rts
 
 timeout:
-                ; 
-                ; Form negated timeout in Y/X.
-                tya
-                eor #$ff
-                tay
-                txa
-                eor #$ff
-                tax
+                ; Y/X = timeout value
 
 loop:
                 ; Save timeout.
                 pla             ;old IRQ state [RL RH]
                 pha             ;save old IRQ state [P RL RH]
-                phy             ;[Y P RL RH]
-                phx             ;[X Y P RL RH]
-                pha             ;save old IRQ state again [P X Y P RL RH]
+                phy             ;[TH P RL RH]
+                phx             ;[TL TH P RL RH]
+                pha             ;save old IRQ state again [P TL TH P RL RH]
 
                 ; Read joystick.
                 lda acccon
-                pha             ;[ACCCON P X Y P RL RH]
+                pha             ;[ACCCON P TL TH P RL RH]
                 lda #acccon.ifj|acccon.y
                 tsb acccon
                 lda (os_seiwk)
@@ -2079,15 +2072,23 @@ find_index_loop:
                 bpl jkey_pressed
                 
 try_osbyte:
-                pla             ;[P X Y P RL RH]
+                
+                pla             ;[P TL TH P RL RH]
                 sta acccon
                 
                 lda os_seiwk+1
-                plp             ;Restore IRQ state [X Y P RL RH]
-                pha             ;Save workspace ptr MSB [WH X Y P RL RH]
+                plp             ;Restore IRQ state [TL TH P RL RH]
+                pha             ;Save workspace ptr MSB [WH TL TH P RL RH]
 
-                ldy #0
+                ; X=0 if (TL|TH)==0, else X=1
+                tsx
+                lda $102,x      ;TL
+                ora $103,x      ;TL|TH
+                tax
+                beq +
                 ldx #1
++
+                ldy #0
                 lda #$81
                 jsr jmp_default_osbyte
                 cpy #$ff
@@ -2097,21 +2098,27 @@ try_osbyte:
                 ; sta os_auto_repeat_countdown
 
                 ; Restore state.
-                pla             ;Restore workspcae ptr MSB [X Y P RL RH]
+                pla             ;Restore workspcae ptr MSB [TL TH P RL RH]
                 sei
                 sta os_seiwk+1
                 stz os_seiwk+0
 
 next:
-                ; Increment timeout, and keep going until 0.
-                plx             ;[Y P RL RH]
+                ; Decrement timeout, and keep going until 0.
+                plx             ;[TH P RL RH]
                 ply             ;[P RL RH]
-                
-                inx
-                bne loop
-                iny
-                bne loop
+                cpx #0
+                bne no_carry
+                ; X=0
+                cpy #0
+                beq timed_out
+                ; Y>0
+                dey
+no_carry:
+                dex
+                jmp loop
 
+timed_out:
                 ; X=0, Y=0. Timed out. Return with C=1 and Y=$ff.
                 plp             ;[RL RH]
                 dey
