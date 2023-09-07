@@ -257,8 +257,10 @@ def main(argv):
         assert (value&0x7f)==value,"not 7-bit"
         # print("    .cerror (%s&$7f)!=%s,'oops'"%(k.value_str,k.value_str))
         # inkey_str='%s^$7f'%(k.value_str)
-        # if key_offsets[i] is not None: inkey_str+='|$80'
-        print('    .byte $%x ; %d %s'%(value^0x7f,i,k.value_str))
+
+        topbit=''
+        if key_offsets[i] is not None: topbit='|$80'
+        print('    .byte $%x%s ; %d %s'%(value^0x7f,topbit,i,k.value_str))
 
     print('key_names_table:')
     for i,k in enumerate(keys):
@@ -270,9 +272,11 @@ def main(argv):
         print(s)
 
     print('key_strings_table:')
+    offset=0
     for i,k in enumerate(keys):
         if needs_string_table_entry(k.name):
-            print('    .shiftl "%s" ; %d'%(k.name,i))
+            print('    .shiftl "%s" ; %d +%d'%(k.name,i,offset))
+            offset+=len(k.name)
 
     # print('electron_keys_table:')
     # electron_keys=128*[None]
