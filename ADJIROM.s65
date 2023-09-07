@@ -705,7 +705,7 @@ loop:
 
                 ; convert to internal key number
                 eor #$ff
-                and #$7f
+                ;and #$7f
 
                 ldy index
                 jsr write_state
