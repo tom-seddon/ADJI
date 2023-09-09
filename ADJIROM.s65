@@ -202,9 +202,16 @@ struct_section: .macro
                 .dsection library
                 
                 .if debug
+                .dsection debug
                 ; The debug ROM is for loading into sideways RAM or
                 ; similar, and can occupy the full 16 KB.
-                .cerror *>$c000,'code overflow'
+                .cerror *>$b000-2,'code overflow'
+*=$b000-3
+debug_num_stack_bytes:
+                .byte 24
+                .word debug_store_a.dest
+debug_data:
+                .cerror *>$c000,'debug overflow'
                 .else
                 ; The real ADJI ROM is 4 KB.
                 .cerror *>$9000,'code overflow'
@@ -259,6 +266,9 @@ cmds_offset=*-command_table
                 .command_table_entry "JTEST",cmd_jtest,help_table.jtest_offset
                 .if debug
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
+                .endif
+                .if debug
+                .command_table_entry "DTEST",cmd_dtest,help_table.none_offset
                 .endif
                 .byte 0
                 .endblock
@@ -1363,7 +1373,6 @@ rom_offset=*+1-overlay_electron
 
 ;-------------------------------------------------------------------------
 
-
 handle_overlay_electron:
                 ; Save this ROM bank.
                 sta os_seiwk+1
@@ -1397,7 +1406,6 @@ handle_overlay_electron:
 
                 ; Reinstate input A.
                 lda os_seiwk+0
-                pha             ;A P ExitL ExitH ROMSEL RetL RetH
 
                 jmp handle_osbyte_electron
 
@@ -1424,14 +1432,14 @@ handle_overlay_exit_electron:
 ; OSBYTE/KEYV handler for Electron.
 ;
 ; Entry: A, X, Y = OSBYTE/KEYV arguments
-;        Stack = [A P RetL RetH]
+;        Stack = [P RetL RetH]
 
 handle_osbyte_electron: .proc
                 ; Don't use the OSBYTE zero page yet - this call might
                 ; be KEYV.
-                pla             ;P RetL RetH
                 cmp #keyv_osbyte
-                beq keyv_electron
+                bne is_osbyte
+                jmp keyv_electron
 
 osbyte_xvector_entry:
                 php
@@ -3449,3 +3457,67 @@ coff_vdu:                       ;TODO could live in keyboard table
 ;-------------------------------------------------------------------------
                 .endsection library
 ;-------------------------------------------------------------------------
+
+                .if debug
+                .section debug
+
+cmd_dtest:
+                jsr debug_store_state
+                rts
+                
+
+debug_store_state: .proc
+                php             ;4
+                pha             ;3
+                txa             ;2
+                pha
+                tya             ;1
+                pha
+
+                tsx
+                lda $104,x      ;P
+                jsr debug_store_a
+                lda $103,x      ;A
+                jsr debug_store_a
+                lda $102,x      ;X
+                jsr debug_store_a
+                lda $101,x      ;Y
+                jsr debug_store_a
+                txa
+                clc
+                adc #7          ;P+A+X+Y+ret address+1
+                jsr debug_store_a
+                tax
+                ldy debug_num_stack_bytes
+loop:
+                lda $100,x
+                jsr debug_store_a
+                inx
+                dey
+                bne loop
+
+                pla
+                tay
+                pla
+                tax
+                pla
+                plp
+                rts
+                .endproc
+                
+debug_store_a: .proc
+                ; skip if no space left
+                bit dest+1
+                bvs done
+dest=*+1
+                sta debug_data
+                inc dest+0
+                bne done
+                inc dest+1
+done:
+                rts
+                .endproc                
+                
+                .endsection debug
+                .endif
+                

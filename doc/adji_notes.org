@@ -341,3 +341,298 @@ Crashes - looks like it scribbles over page $d!
 
 Works OK with overlay at &150
 
+
+
+* BASIC Editor OSBYTE vs overlay issue
+
+** qnd investigation
+
+stack contents...
+
+17
+35
+8d
+
+# 8d, 17 presumably from this
+					                ; Insert overlay exit routine address
+.8d0a	a9 8d		lda #$8d	                lda #>handle_overlay_exit_electron-1
+.8d0c	48		pha		                pha             ;ExitH ROMSEL RetL RetH
+.8d0d	a9 17		lda #$17	                lda #<handle_overlay_exit_electron-1
+.8d0f	48		pha		                pha             ;ExitL ExitH ROMSEL RetL RetH
+
+...but what about the 35?!
+
+62
+8d
+
+.8d5f	28		plp		                plp
+.8d60	20 e6 8e	jsr $8ee6	                jsr jmp_default_osbyte.with_p_already_pushed
+.8d63	60		rts		                rts
+
+01
+
+ROM of BASIC editor
+
+ae
+9b
+
+.9baa					do_options_osbyte:
+.9baa	a9 1a		lda #$1a	                lda #OPTIONS_OSBYTE   ;must be position-independent
+.9bac	20 f4 ff	jsr $fff4	                jsr osbyte            ;must be position-independent
+
+
+b3
+80
+
+.80af					svc_brk:
+.80af	98		tya		                tya
+.80b0	48		pha		                pha
+.80b1	20 b1 9b	jsr $9bb1	                jsr language.get_options
+
+** debug_store_state 1
+
+#+begin_example
+  P=&B5 A=&EA X=&00 Y=&FF S=&EC
+   B5 : P
+   57 8D : .8d55	20 a1 90	jsr $90a1	                jsr debug_store_state
+   B0 : P
+   1F 8D : handle_overlay_exit_electron:
+   0D : ROMSEL
+   F0 87 : .87ee	20 f4 ff	jsr $fff4	                jsr osbyte
+   1E 84 : .841c	20 7a 90	jsr $907a	                jsr call_command_table_routine
+   00 : saved Y
+   04 : saved A
+   BD F0 : JSR &8003       :\ F0BB= 20 03 80     ..
+   0B
+  P=&B4 A=&1A X=&FF Y=&FF S=&DA
+   B4 : P
+   57 8D  : ^^^
+   35 : P
+   1F 8D : ^^^
+   01 : ROMSEL
+   AE 9B : .9bac	20 f4 ff	jsr $fff4	                jsr osbyte            ;must be position-independent
+   B3 80 : .80b1	20 b1 9b	jsr $9bb1	                jsr language.get_options
+   FF : saved Y
+   06 : saved A
+   BD F0 : JSR &8003
+   0D
+  P=&36 A=&1A X=&FF Y=&00 S=&C8
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&B6
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&A4
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&92
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&80
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&6E
+   36 57 8D 35 1F 8D 01 AE
+   9B B3 80 00 06 BD F0 0D
+#+end_example
+
+** debug_store_state 2
+
+#+begin_example
+  P=&B5 A=&EA X=&00 Y=&FF S=&ED
+   &01ED: 57
+   &01EE: 8D : .8d55	20 a1 90	jsr $90a1	                jsr debug_store_state
+   &01EF: B0 : P
+   &01F0: 1F
+   &01F1: 8D : handle_overlay_exit_electron:
+   &01F2: 0D : ROMSEL
+   &01F3: F0
+   &01F4: 87 : .87ee	20 f4 ff	jsr $fff4	                jsr osbyte
+   &01F5: 1E
+   &01F6: 84 : .841c	20 7a 90	jsr $907a	                jsr call_command_table_routine
+   &01F7: 00 : saved Y
+   &01F8: 04 : saved A
+   &01F9: BD
+   &01FA: F0 : JSR &8003       :\ F0BB= 20 03 80     ..
+   &01FB: 0B : original ROM (BASIC)
+   &01FC: B0
+   &01FD: DD : JSR LF0A8       :\ DDAE= 20 A8 F0     (p
+   &01FE: CB
+   &01FF: BE : BEC9 jsr $fff7 (BASIC 2 ROM)
+
+  P=&B4 A=&1A X=&FF Y=&FF S=&DB
+   &01DB: 57
+   &01DC: 8D : ^^^
+   &01DD: 35 : P
+   &01DE: 1F
+   &01DF: 8D : ^^^
+   &01E0: 01 : ROMSEL
+   &01E1: AE
+   &01E2: 9B : .9bac	20 f4 ff	jsr $fff4	                jsr osbyte            ;must be position-independent
+   &01E3: B3
+   &01E4: 80 : .80b1	20 b1 9b	jsr $9bb1	                jsr language.get_options
+   &01E5: FF : saved Y
+   &01E6: 06 : saved A
+   &01E7: BD
+   &01E8: F0 : JSR &8003       :\ F0BB= 20 03 80     ..
+   &01E9: 0D : original ROM (ADJI)
+   &01EA: 1F
+   &01EB: DB : LDX #&06:JSR LF0A8   :\ Issue service call 6 - BRK occured
+   &01EC: 00 : old X
+   &01ED: B8 : P pushed by BRK
+   &01EE: 90 
+   &01EF: B0 : address of BRK... WHAT IS THIS
+   &01F0: 1F
+   &01F1: 8D
+   &01F2: 0D
+  P=&36 A=&1A X=&FF Y=&00 S=&C9
+   &01C9: 57
+   &01CA: 8D
+   &01CB: 35
+   &01CC: 1F
+   &01CD: 8D
+   &01CE: 01
+   &01CF: AE
+   &01D0: 9B
+   &01D1: B3
+   &01D2: 80
+   &01D3: 00
+   &01D4: 06
+   &01D5: BD
+   &01D6: F0
+   &01D7: 0D
+   &01D8: 1F
+   &01D9: DB
+   &01DA: 00
+   &01DB: 39
+   &01DC: 90
+   &01DD: 35 : address of BRK... hmm...
+   &01DE: 1F
+   &01DF: 8D
+   &01E0: 01
+  P=&36 A=&1A X=&FF Y=&00 S=&B7
+   &01B7: 57
+   &01B8: 8D
+   &01B9: 35
+   &01BA: 1F
+   &01BB: 8D
+   &01BC: 01
+   &01BD: AE
+   &01BE: 9B
+   &01BF: B3
+   &01C0: 80
+   &01C1: 00
+   &01C2: 06
+   &01C3: BD
+   &01C4: F0
+   &01C5: 0D
+   &01C6: 1F
+   &01C7: DB
+   &01C8: 00
+   &01C9: 39
+   &01CA: 90
+   &01CB: 35
+   &01CC: 1F
+   &01CD: 8D
+   &01CE: 01
+  P=&36 A=&1A X=&FF Y=&00 S=&A5
+   &01A5: 57
+   &01A6: 8D
+   &01A7: 35
+   &01A8: 1F
+   &01A9: 8D
+   &01AA: 01
+   &01AB: AE
+   &01AC: 9B
+   &01AD: B3
+   &01AE: 80
+   &01AF: 00
+   &01B0: 06
+   &01B1: BD
+   &01B2: F0
+   &01B3: 0D
+   &01B4: 1F
+   &01B5: DB
+   &01B6: 00
+   &01B7: 39
+   &01B8: 90
+   &01B9: 35
+   &01BA: 1F
+   &01BB: 8D
+   &01BC: 01
+  P=&36 A=&1A X=&FF Y=&00 S=&93
+   &0193: 57
+   &0194: 8D
+   &0195: 35
+   &0196: 1F
+   &0197: 8D
+   &0198: 01
+   &0199: AE
+   &019A: 9B
+   &019B: B3
+   &019C: 80
+   &019D: 00
+   &019E: 06
+   &019F: BD
+   &01A0: F0
+   &01A1: 0D
+   &01A2: 1F
+   &01A3: DB
+   &01A4: 00
+   &01A5: 39
+   &01A6: 90
+   &01A7: 35
+   &01A8: 1F
+   &01A9: 8D
+   &01AA: 01
+  P=&36 A=&1A X=&FF Y=&00 S=&81
+   &0181: 57
+   &0182: 8D
+   &0183: 35
+   &0184: 1F
+   &0185: 8D
+   &0186: 01
+   &0187: AE
+   &0188: 9B
+   &0189: B3
+   &018A: 80
+   &018B: 00
+   &018C: 06
+   &018D: BD
+   &018E: F0
+   &018F: 0D
+   &0190: 1F
+   &0191: DB
+   &0192: 00
+   &0193: 39
+   &0194: 90
+   &0195: 35
+   &0196: 1F
+   &0197: 8D
+   &0198: 01
+  P=&36 A=&1A X=&FF Y=&00 S=&6F
+   &016F: 57
+   &0170: 8D
+   &0171: 35
+   &0172: 1F
+   &0173: 8D
+   &0174: 01
+   &0175: AE
+   &0176: 9B
+   &0177: B3
+   &0178: 80
+   &0179: 00
+   &017A: 06
+   &017B: BD
+   &017C: F0
+   &017D: 0D
+   &017E: 1F
+   &017F: DB
+   &0180: 00
+   &0181: 39
+   &0182: 90
+   &0183: 35
+   &0184: 1F
+   &0185: 8D
+   &0186: 01
+#+end_example
