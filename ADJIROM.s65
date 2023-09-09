@@ -163,6 +163,7 @@ struct_section: .macro
                 .struct_section cmd_jkeys_workspace
                 .struct_section cmd_jsetup_workspace
                 .struct_section cmd_jstate_workspace
+                .struct_section cmd_ddump_workspace
                 .endunion
                 
                 .cerror *>$b0,'zp overflow'
@@ -206,10 +207,6 @@ struct_section: .macro
                 ; The debug ROM is for loading into sideways RAM or
                 ; similar, and can occupy the full 16 KB.
                 .cerror *>$b000-2,'code overflow'
-*=$b000-3
-debug_num_stack_bytes:
-                .byte 24
-                .word debug_store_a.dest
 debug_data:
                 .cerror *>$c000,'debug overflow'
                 .else
@@ -268,6 +265,8 @@ cmds_offset=*-command_table
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
                 .endif
                 .if debug
+                .command_table_entry "DRESET",cmd_dreset,help_table.none_offset
+                .command_table_entry "DDUMP",cmd_ddump,help_table.none_offset
                 .command_table_entry "DTEST",cmd_dtest,help_table.none_offset
                 .endif
                 .byte 0
@@ -3459,12 +3458,167 @@ coff_vdu:                       ;TODO could live in keyboard table
 ;-------------------------------------------------------------------------
 
                 .if debug
+
+; The debug stuff prints DOS-style line endings, so 13,10 rather than
+; 10,13. Looks the same on the screen, but saves a moment when loading
+; the SPOOLed output into Emacs, which has apparently no way of
+; supporting Acorn-style 2-byte line endings.
+                
                 .section debug
+
+debug_num_stack_bytes=24
+
+;-------------------------------------------------------------------------
 
 cmd_dtest:
                 jsr debug_store_state
+                jsr debug_print_info
+                rts
+
+;-------------------------------------------------------------------------
+
+cmd_dreset:
+                lda #<debug_buffer
+                sta debug_dest+0
+                lda #>debug_buffer
+                sta debug_dest+1
+                jsr debug_print_info
+                rts
+
+;-------------------------------------------------------------------------
+
+debug_print_info:
+                jsr print_following_string
+                .text 'debug_buffer=&'
+                .text format('%04X',debug_buffer)
+                .text 13,10     ;DOS-style
+                .text 'dest=&',0
+
+                lda debug_dest+1
+                jsr print_hex_byte
+                lda debug_dest+0
+                jsr print_hex_byte
+
+                jmp debug_newl
+
+;-------------------------------------------------------------------------
+
+debug_newl:
+                lda #13
+                jsr oswrch
+                lda #10
+                jsr oswrch
                 rts
                 
+;-------------------------------------------------------------------------
+
+cmd_ddump: .proc
+                .section cmd_ddump_workspace
+ptr: .fill 2
+s_value: .fill 1
+                .endsection
+                
+                jsr debug_print_info
+                
+                lda #>debug_buffer
+                sta ptr+1
+                lda #<debug_buffer
+                sta ptr+0
+
+records_loop:                
+                jsr eod
+                bcs done
+
+                ; 0123456789012345678901234567890123456789
+                ; A=&xx X=&xx Y=&xx S=&xx P=&xx
+                jsr print_following_string
+                .text 'A=&',0
+                jsr read_and_print_byte
+                
+                jsr print_following_string
+                .text ' X=&',0
+                jsr read_and_print_byte
+                
+                jsr print_following_string
+                .text ' Y=&',0
+                jsr read_and_print_byte
+                
+                jsr print_following_string
+                .text ' P=&',0
+                jsr read_and_print_byte
+                
+                jsr print_following_string
+                .text ' S=&',0
+                jsr read_and_print_byte
+                sta s_value
+                
+                jsr debug_newl
+
+                ldx #0
+stack_loop:
+                jsr print_following_string
+                .text ' &',0
+                
+                clc
+                txa
+                adc s_value
+                pha
+                lda #1
+                adc #0
+                jsr print_hex_byte
+                pla
+                jsr print_hex_byte
+                
+                jsr print_following_string
+                .text ': ',0
+
+                jsr read_a
+                jsr print_hex_byte
+
+                jsr print_following_string
+                .text ' : ',13,10,0
+
+                inx
+                cpx #debug_num_stack_bytes
+                bne stack_loop
+                jsr debug_newl
+                jmp records_loop
+                
+done:
+                rts
+
+read_and_print_byte:
+                jsr read_a
+                jmp print_hex_byte
+
+read_a: .proc
+                jsr eod
+                bcs _null
+                ldy #0
+                lda (ptr),y
+                inc ptr+0
+                bne _done
+                inc ptr+1
+_done:
+                rts
+_null:
+                lda #0
+                rts
+                .endproc
+
+eod: .proc
+                lda ptr+1
+                cmp debug_dest+1
+                bne _done        ;exit with C=1 (gt) or C=0 (lt)
+                lda ptr+0
+                cmp debug_dest+0 ;C=1 (ge) or C=0 (lt)
+_done:
+                rts
+                .endproc
+
+                .endproc
+
+;-------------------------------------------------------------------------
 
 debug_store_state: .proc
                 php             ;4
@@ -3475,20 +3629,20 @@ debug_store_state: .proc
                 pha
 
                 tsx
-                lda $104,x      ;P
-                jsr debug_store_a
                 lda $103,x      ;A
                 jsr debug_store_a
                 lda $102,x      ;X
                 jsr debug_store_a
                 lda $101,x      ;Y
                 jsr debug_store_a
+                lda $104,x      ;P
+                jsr debug_store_a
                 txa
                 clc
                 adc #7          ;P+A+X+Y+ret address+1
-                jsr debug_store_a
+                jsr debug_store_a ;S
                 tax
-                ldy debug_num_stack_bytes
+                ldy #debug_num_stack_bytes
 loop:
                 lda $100,x
                 jsr debug_store_a
@@ -3507,17 +3661,23 @@ loop:
                 
 debug_store_a: .proc
                 ; skip if no space left
-                bit dest+1
+                bit debug_dest+1
                 bvs done
-dest=*+1
-                sta debug_data
-                inc dest+0
+sta_debug_buffer:
+                sta debug_buffer
+                inc debug_dest+0
                 bne done
-                inc dest+1
+                inc debug_dest+1
 done:
                 rts
-                .endproc                
-                
+                .endproc
+
+debug_dest=debug_store_a.sta_debug_buffer+1
+
+;-------------------------------------------------------------------------
+
+debug_buffer:
                 .endsection debug
+                
                 .endif
                 
