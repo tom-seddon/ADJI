@@ -953,8 +953,11 @@ loop:
                 jsr read_joystick
                 sta jvalue
 
+                ; 01234567890123456789012345
+                ; Raw value: &xx (%xxxxxxxx)
+
                 jsr print_following_string
-                .text 31,5,5,"Raw value: &",0
+                .text 31,8,5,"Raw value: &",0
 
                 lda jvalue
                 jsr print_hex_byte
