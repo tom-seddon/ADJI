@@ -2143,35 +2143,18 @@ kkey_pressed:
                 rts
 
 jkey_pressed:
-                ldx os_auto_repeat_countdown
-                beq reset_auto_repeat_countdown
-                dec os_auto_repeat_countdown
-                bne try_osbyte
-reset_auto_repeat_countdown:
-                ldx os_auto_repeat_period
-                stx os_auto_repeat_countdown
-                
-                pha             ;save internal key number [K ACCCON P X Y P RL RH]
-                lda #$ac        ;Keyboard translation table address
-                                ;AUG p 183
-                jsr osbyte_x00_yff
-                ; ldx #$00
-                ; ldy #$ff
-                ; jsr osbyte
-                sei
-                stx os_seiwk+0  ;keyboard translation table LSB
-                sty os_seiwk+1  ;keyboard translation table MSB
-                pla             ;restore internal key number [ACCCON P X Y P RL RH]
-                tay             ;Y=internal key number
-                lda (os_seiwk),y
-                bne +           ;taken if not TAB
-                lda os_tab_key_code
+                cmp #16
+                bcc try_osbyte  ;definitely not ASCII
+                tay
+                lda key_chars_table-16,y ;A=ASCII value of key pressed
+                bmi try_osbyte           ;bail if not ASCII
+                bne +                    ;taken if TAB
+                lda os_tab_key_code      ;adjust TAB code
 +
                 ; The Slogger ROM doesn't handle shift, ctrl, caps
                 ; lock, etc., so this one doesn't either.
-                jsr toupper
-                
-                tax             ;X = ASCII value of key pressed
+
+                tax             ;X = ASCII Value of key pressed
                 pla             ;get old ACCCON value [P X Y P RL RH]
                 sta acccon
                 pla             ;discard old IRQ state copy [X Y P RL RH]
