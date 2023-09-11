@@ -1181,49 +1181,14 @@ electron_loop:
                 lda $f4
                 sta (strtoi_value),y
 
-                .if debug
-                ldy #0
-print_overlay_loop:
-                lda (strtoi_value),y
-                jsr print_hex_byte
-                lda #' '
-                jsr oswrch
-                iny
-                cpy #size(overlay_electron)
-                bne print_overlay_loop
-                jsr osnewl
-                .endif
-
                 ; Point BYTEV to the right place.
                 lda #overlay_electron.osbyte_entry_offset
                 jsr set_overlay_bytev
-
-                .if debug
-                lda bytev+1
-                jsr print_hex_byte
-                lda bytev+0
-                jsr print_hex_byte
-                jsr osnewl
-
-                lda elk_jflags
-                jsr print_hex_byte
-                jsr osnewl
-                lda #'.'
-                jsr oswrch
-                .endif
 
                 ; Maybe point KEYV to the right place.
                 ldx #overlay_electron.keyv_entry_offset
                 jsr maybe_set_overlay_keyv
 
-                .if debug
-                lda keyv+1
-                jsr print_hex_byte
-                lda keyv+0
-                jsr print_hex_byte
-                jsr osnewl
-                .endif
-                
                 rts
 
 os_wut:
