@@ -46,6 +46,6 @@ assigned dummy keys to the unused axis.
 |Bonecruncher|||-|-|ignored|
 |Camelot|`_JKEYS 1 &B7 &97 &9E &BD &B6 &9D &880`|?|-|-|ignored|
 |Citadel|||||no room for overlay :(|
-|Croaker||||||poor responsiveness|
+|Croaker|||||poor responsiveness|
 
 # Master
