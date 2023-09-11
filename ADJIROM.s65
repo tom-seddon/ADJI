@@ -1581,6 +1581,7 @@ reset_auto_repeat_countdown:
 ;
 ; Entry: A = $80, ?os_a = $80
 ;        ?os_x, ?os_y = OSBYTE $80 entry arguments
+;        Stack = [P RetL RetH]
 ;
 osbyte_80_electron: .proc
                 ; Bail if not ADVAL.
@@ -1603,6 +1604,7 @@ osbyte_80_electron: .proc
                 lda $fc00,y
                 sta os_a
 
+                plp
                 jmp osbyte_80_generic
                 .endproc
 
@@ -2492,6 +2494,8 @@ osbyte_80_generic: .proc
                 cpx #0
                 beq test_fire
 
+                ldy #$00        ;probably correct...
+
                 lda os_a
                 and max_value_masks-1,x
                 bne max_value
@@ -2507,30 +2511,26 @@ zero:
 
 max_value:
                 ldx #$ff
-                ldy #$ff
+                dey             ;Y=$ff
                 rts
 
 min_value:
                 ldx #$00
-                ldy #$00
                 rts
 
 test_fire:
                 ldy #4          ;fake last ADC conversion channel
+                ; X=0 - assume no buttons pressed
                 
                 lda os_a
-                and #jfire1_mask
-                bne fire_yes
-fire_no:
-                ldx #0
+                and #jfire1_mask|jfire2_mask
+                beq +
+                inx             ;X=1
++
                 rts
 
-fire_yes:
-                ldx #1
-                rts
-
-min_value_masks: .byte jright_mask,jup_mask,0,0
-max_value_masks: .byte jleft_mask,jdown_mask,0,0
+min_value_masks: .byte jright_mask,jdown_mask,0,0
+max_value_masks: .byte jleft_mask,jup_mask,0,0
                 .endproc
 
 ;-------------------------------------------------------------------------
