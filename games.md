@@ -21,6 +21,7 @@ assigned dummy keys to the unused axis.
 | Alien Dropout|`*JKEYS 1 &B7 &97 &9E &BD &A6 &A6 &150`|y|-|-||
 |Ballistix|`*JKEYS 1 &DE &AE &9E &BD &EF &EF &880`|n|-|-||
 |Blast!|`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &880`|n|-|-||
+|Blitzkrieg|||||set interface address to &FCC0, then say Y when it asks if you have a First Byte interface|
 |Bug Blaster|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|n|-|-||
 |Caveman Capers|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|n|-|-||
 |Centibug|`*JKEYS 1 &B7 &97 &9E &BD &A6 &A6 &150`|y|-|-||
@@ -35,7 +36,7 @@ assigned dummy keys to the unused axis.
 
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
-|Alphatron|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|-|-|Remove ~FORX=672 TO 687:?X=0:NEXT~ from ~ALPHA-3~|
+|Alphatron|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|-|-|Remove `FORX=672 TO 687:?X=0:NEXT` from `ALPHA-3`|
 
 ## Not working
 
