@@ -6,8 +6,6 @@ cartridge for the Acorn Electron/BBC Master 128.
 Based in part on the Slogger Electron Expansion 2.02 ROM:
 https://github.com/tom-seddon/SloggerElectronExpansion
 
-**Extremely WIP**
-
 # Using the ADJI
 
 Requires Electron or Master 128.
@@ -15,8 +13,7 @@ Requires Electron or Master 128.
 Connect the joystick interface to one of the cartridge slots, and plug
 a 9-pin joystick into the 9-pin plug.
 
-Load the ROM into sideways RAM. In theory it should run from the
-socket on the ADJI cartridge! It doesn't matter which bank it's in.
+The ROM can run from any bank, including sideways RAM.
 
 ## `*JTEST` - test the joystick
 
@@ -37,8 +34,6 @@ The ADJI supports 2 independent fire buttons if the joystick has them.
 
 ## `*JSETUP` - set up the joystick
 
-**WIP instructions**
-
 You'll be prompted for the following. Press Escape at any time to
 cancel.
 
@@ -52,7 +47,7 @@ If behaving as an analogue joystick, it behaves as if it's the first
 analogue joystick, and its state can be read with `ADVAL` or OSBYTE
 &80:
 
-- `ADVAL(0)` reports the digital fire button 1
+- `ADVAL(0)` reports the fire button - both are treated the same
 - `ADVAL(1)` reports the digital left/right axis
 - `ADVAL(2)` reports the digital up/down axis
 
@@ -75,12 +70,24 @@ the keyboard and joystick processing.
 method, but many games overwrite the relevant OS workspace and so you
 may experience crashes or hangs. 
 
-`Overlay` installs a short (max 20 bytes) routine somewhere in RAM to
-handle the hooking. There's no best place for this, so you'll be
-prompted for an address! The default of &150, which will be used if
-you just press Return when prompted, should be good for many games.
+`Overlay` installs a short routine somewhere in RAM to handle the
+hooking. (The routine is 15 bytes on the Master, and 18 bytes on the
+Electron.) There's no best place for this to go, so you'll be prompted
+for an address!
 
-If providing an address in hex, precede with `&`, as per BASIC.
+The default of &150, which will be used if you just press Return when
+prompted, should be good for many games. If you still experience
+problems, unfortunately some experimentation may be necessary. These
+other options are all worth trying:
+
+- &100-&140 inclusive - also in the stack area
+- &880-&8A0 inclusive - the printer buffer
+- &380-&3C0 inclusive (disk only) - OS tape workspace
+
+If using the printer buffer, you must then avoid using the printer,
+and if using the OS tape workspace, you must then avoid using tapes!
+
+When providing an address in hex, precede with `&`, as per BASIC.
 
 Once the questions are over, `*JSETUP` will install the hooks and
 finish. Last thing it does is print a `*JKEYS` (see below) or `*JJOY`
@@ -178,16 +185,23 @@ Keys specific to B/Master:
 
 The ROM uses 1 page of HAZEL to store its data.
 
+## Electron
+
+The ROM sneaks its data into 7 otherwise-unused bytes of OS workspace.
+One byte is used for flags:
+
+- &0290 - unused by Electron OS
+
+The remaining 6 are used when the joystick behaves as keys, to store
+the key assignments:
+
+- &02A8 - ROM flags for the keyboard's other ROM bank
+- &02A9 - ROM flags for the keyboard's ROM bank
+- &02AA - ROM flags for the BASIC ROM's other bank
+- &02F5 - unused by Electron OS
+- &02F6 - unused by Electron OS
+- &027E - unused by Electron OS
+
 # Compatibility notes
 
-In most cases, you'll find things work using an overlay address of
-&150. This list notes the exceptions I've found.
-
-## Frak (Superior re-release) (Master 128)
-
-Works with overlay address of &120.
-
-## Zalaga (Superior re-release) (Master 128)
-
-Hooks are simply ignored. Perhaps it resets the vectors. To be
-investigated.
+See https://github.com/tom-seddon/ADJI/blob/main/games.md
