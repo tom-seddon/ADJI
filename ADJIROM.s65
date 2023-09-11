@@ -714,7 +714,11 @@ loop:
 
                 ; convert to internal key number
                 eor #$ff
-                ;and #$7f
+
+                ; bit 7 must be clear! Some of these values are stored
+                ; in the ROM status bytes, and bit 7 implies that bank
+                ; is a valid ROM with a a service entry...
+                and #$7f
 
                 ldy index
                 jsr write_state
