@@ -15,6 +15,8 @@ assigned dummy keys to the unused axis.
 
 ## Working
 
+Compatible with one or both of `*JKEYS` and `*JJOY`.
+
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
 |Airlift|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|`*JJOY 1 &150`|y||
@@ -34,18 +36,52 @@ assigned dummy keys to the unused axis.
 
 ## Requires modification
 
+Can be modified to be compatible with one or both of `*JKEYS` and
+`*JJOY`.
+
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
 |Alphatron|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|-|-|Remove `FORX=672 TO 687:?X=0:NEXT` from `ALPHA-3`|
 
+## Not compatible
+
+Not compatible with either `*JKEYS` or `*JJOY`.
+
+| Game | Explanation |
+| --- | --- |
+
 ## Not working
+
+| Game | Issue |
+| --- | --- |
+| Boffins 2| https://github.com/tom-seddon/ADJI/issues/25|
+| Bonecruncher| https://github.com/tom-seddon/ADJI/issues/26|
+| Camelot| https://github.com/tom-seddon/ADJI/issues/27|
+| Citadel| https://github.com/tom-seddon/ADJI/issues/28|
+| Croaker| https://github.com/tom-seddon/ADJI/issues/29|
+
+# Master
+
+## Working
 
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
-|Boffins 2|`_JKEYS 1 &A8 &98 &9E &BD &B6 &B6 &150`|y|-|-|slow movement|
-|Bonecruncher|||-|-|ignored|
-|Camelot|`_JKEYS 1 &B7 &97 &9E &BD &B6 &9D &880`|?|-|-|ignored|
-|Citadel|||||no room for overlay :(|
-|Croaker|||||poor responsiveness|
 
-# Master
+## Requires modification
+
+| Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
+| --- | --- | --- | --- | --- | --- |
+
+## Not compatible
+
+| Game | Reason |
+| --- | --- |
+| Astro Blaster | Accesses hardware directly |
+| Prince of Persia | Uses all the memory |
+| White Light | Accesses hardware directly |
+
+## Not working
+
+| Game | Issue |
+| --- | --- |
+| Plan B2 | https://github.com/tom-seddon/ADJI/issues/30 |
