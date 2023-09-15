@@ -25,26 +25,39 @@ _V:=$(if $(VERBOSE),,@)
 ##########################################################################
 ##########################################################################
 
-TASS_ARGS:=$(if $(VERBOSE),,--quiet) --nostart --case-sensitive -Wall --verbose-list --long-branch
+BUILD_TIME:=$(shell $(SHELLCMD) strftime -d _ _Y_m_d-_H_M_S)
+
+TASS_ARGS:=$(if $(VERBOSE),,--quiet) --nostart --case-sensitive -Wall --verbose-list --long-branch "-Dbuild_time=\"$(BUILD_TIME)\""
+
+TASS_OUTPUTS="--output=$(BUILD)/$1.bin" "--list=$(BUILD)/$1.lst" "--map=$(BUILD)/$1.map"
+
 
 ##########################################################################
 ##########################################################################
 
 .PHONY:build
+build: _DEBUG_TIME:=
 build:
 	$(_V)$(SHELLCMD) mkdir "$(BUILD)"
 	$(_V)$(SHELLCMD) mkdir "$(BEEB_BUILD)"
 
 	$(_V)$(PYTHON) tools/print_key_tables.py >"$(BUILD)/generated_key_tables.s65"
 
-	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=false "--list=$(BUILD)/ADJIROM.lst" "--output=$(BUILD)/ADJIROM.bin" "--map=$(BUILD)/ADJIROM.map" ADJIROM.s65
-	$(_V)$(TASS) $(TASS_ARGS) -Ddebug=true "-Ddebug_time=\"$(shell $(SHELLCMD) strftime -d _ _Y_m_d-_H_M_S)\"" "--list=$(BUILD)/ADJIROM_debug.lst" "--output=$(BUILD)/ADJIROM_debug.bin" ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=false -Ddebug=false $(call TASS_OUTPUTS,ADJIROM) ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=false -Ddebug=true $(call TASS_OUTPUTS,ADJIROM_debug) ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=false $(call TASS_OUTPUTS,ADJIROM_1fire) ADJIROM.s65
+	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=true $(call TASS_OUTPUTS,ADJIROM_1fire_debug) ADJIROM.s65
 
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJIROM"
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJIROM"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJI"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJI"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire.bin" "$(BEEB_BUILD)/$$.ADJI1F"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire_debug.bin" "$(BEEB_BUILD)/D.ADJI1F"
+
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) stat --size-budget 4096 "$(BUILD)/ADJIROM.bin"
+	$(_V)$(SHELLCMD) stat --size-budget 4096 "$(BUILD)/ADJIROM_1fire.bin"
 	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM_debug.bin"
+	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM_1fire_debug.bin"
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) sha1 "$(BUILD)/ADJIROM.bin"
 

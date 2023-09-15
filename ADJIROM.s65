@@ -49,17 +49,24 @@ keyv_osbyte=83
 
 brkbuf=$100
 
-                .if debug
-rom_name='ADJI (debug) '..debug_time
-                .else
-rom_name='ADJI'
+rom_name:='ADJI'
+                .if single_fire_button
+rom_name..=' (1F)'
                 .endif
+                .if debug
+rom_name..=' (debug)'
+                .endif
+                
 rom_ver='0.04'
 
 default_overlay_address=$150
                 
 ; Up=0, Down=1, Left=2, Right=3, Fire1=4, Fire2=5
+                .if single_fire_button
+num_actions=5
+                .else
 num_actions=6
+                .endif
 
 ;-------------------------------------------------------------------------
 ;
@@ -122,7 +129,9 @@ elk_down=$02a9                  ;ROM flags for keyboard
 elk_left=$02aa                  ;ROM flags for lower-priority BASIC
 elk_right=$02f5                 ;unused by Electron OS
 elk_fire1=$02f6                 ;unused by Electron OS
+                .if !single_fire_button
 elk_fire2=$027e                 ;unused by Electron OS
+                .endif
 
 ;-------------------------------------------------------------------------
 
@@ -135,8 +144,15 @@ jdown_mask=2
 jleft_mask=4
 jright_mask=8
 jfire1_mask=16
+                .if single_fire_button
+jall_fire_mask=jfire1_mask
+                .else
 jfire2_mask=32
-jall_mask=jfire2_mask|jfire1_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
+jall_fire_mask=jfire1_mask|jfire2_mask
+                .endif
+                
+jall_mask=jall_fire_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
+                
                 
 ;-------------------------------------------------------------------------
 
@@ -280,7 +296,13 @@ none_offset=*-help_table
 jjoy_offset=*-help_table
                 .text ' <no> X|<addr>',0
 jkeys_offset=*-help_table
-                .text ' <no> <up> <down> <left> <right> <fire1> <fire2> X|<addr>',0
+                .text ' <no> <up> <down> <left> <right> <fire1> '
+                .if single_fire_button
+                .text '<dummy>'
+                .else
+                .text '<fire2>'
+                .endif
+                .text ' X|<addr>',0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -315,7 +337,9 @@ masks:
                 .byte jleft_mask
                 .byte jright_mask
                 .byte jfire1_mask
+                .if !single_fire_button
                 .byte jfire2_mask
+                .endif
 names:
                 ;      01234
                 .text "     "
@@ -324,7 +348,9 @@ names:
                 .text "LEFT "
                 .text "RIGHT"
                 .text "FIRE1"
+                .if !single_fire_button
                 .text "FIRE2"
+                .endif
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -336,7 +362,9 @@ elk_state_offsets: .proc
                 .byte <elk_left
                 .byte <elk_right
                 .byte <elk_fire1
+                .if !single_fire_button
                 .byte <elk_fire2
+                .endif
                 .endproc
                 
 joystick_fred_offsets:
@@ -729,6 +757,12 @@ loop:
                 bne loop
 
                 ldy yval
+
+                .if single_fire_button
+                ; Conside FIRE2 setting
+                jsr strtoi
+                .endif
+                
                 jmp handle_install_mode
                 .endproc
 
@@ -851,6 +885,11 @@ print_keys_loop:
                 inx
                 cpx #State.action_keys+num_actions
                 bne print_keys_loop
+
+                .if single_fire_button
+                jsr print_following_string
+                .text ' 0',0
+                .endif
 
                 jsr print_hook_info
                 jmp install
@@ -1689,11 +1728,13 @@ test_fire1:
                 bne pressed
 
 test_fire2:
+                .if !single_fire_button
                 cpx elk_fire2
                 bne pass_to_keyv
                 tya
                 and #jfire2_mask
                 bne pressed
+                .endif
 
 pass_to_keyv:
                 lda os_seiwk+0  ;internal key number
@@ -2527,7 +2568,7 @@ test_fire:
                 ; X=0 - assume no buttons pressed
                 
                 lda os_a
-                and #jfire1_mask|jfire2_mask
+                and #jall_fire_mask
                 beq +
                 inx             ;X=1
 +

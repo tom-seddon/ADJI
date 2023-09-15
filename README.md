@@ -15,6 +15,18 @@ a 9-pin joystick into the 9-pin plug.
 
 The ROM can run from any bank, including sideways RAM.
 
+## Slogger interface compatibility
+
+There is a special version of the ROM for use with the original
+Slogger Switched Joystick Interface cartridge. This doesn't support a
+2nd fire button, but is otherwise fully-featured!
+
+This ROM reports itself as `(1F)` in the `*HELP` output.
+
+Note that `*JKEYS` still requires a valid number to be specified for
+the second fire button, even though the value is ignored. `*JSETUP`
+will suggest `0`.
+
 ## `*JTEST` - test the joystick
 
 To test it out, use `*JTEST`. This takes one parameter: the joystick
@@ -197,7 +209,7 @@ the key assignments:
 
 - &02A8 - ROM flags for the keyboard's other ROM bank
 - &02A9 - ROM flags for the keyboard's ROM bank
-- &02AA - ROM flags for the BASIC ROM's other bank
+- &02AA - ROM flags for the BASIC ROM's other ROM bank
 - &02F5 - unused by Electron OS
 - &02F6 - unused by Electron OS
 - &027E - unused by Electron OS
