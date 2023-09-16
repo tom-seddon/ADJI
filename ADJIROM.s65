@@ -93,11 +93,18 @@ action_keys: .fill num_actions
                 .endstruct
                 .cerror State.jflags!=0,'State jflags must be at offset 0'
 
+                ; The state has to fit in the 8 bytes reserved for the
+                ; Master 128 FS info block, and 1 byte is taken up by
+                ; the 1st char of the name.
+                .cerror size(State)>7,'State must be max 7 bytes'
+
 ;-------------------------------------------------------------------------
 ;
 ; ROM state on Master 128 is stored in a page in HAZEL. Layout just as
 ; per the struct.
 ;
+
+hazel_state_addr=$df00
 
 ; OSBYTE 209 (&D1) is reserved for the speech system [MasRef D.2-67]
 ; master_spare=$0261
@@ -529,11 +536,8 @@ svc: .proc
                 beq star
                 cmp #9
                 beq help
-                ; https://beebwiki.mdfs.net/Using_high_workspace
-                cmp #$22
-                beq claim_hazel
-                cmp #$24
-                beq count_hazel
+                cmp #$25
+                beq store_fs_info
 unclaimed:
                 pla
 done:
@@ -546,20 +550,27 @@ claimed:
                 lda #0
                 beq done    ;i.e., JMP
 
-count_hazel:
-                dey             ;1 page required
+store_fs_info:
+                tya             ;A=offset
+                .cpu '65c02'
+                inc a           ;+1
+                .cpu 'default'
+                sta $df0,x
+                ldx #0
+-
+                lda fs_info_block,x
+                sta ($f2),y
+                iny
+                inx
+                cpx #11
+                bne -
                 jmp unclaimed
 
-claim_hazel:
-                tya
-                cmp #$dc        ;run out of HAZEL space?
-                bcc +           ;taken if not run out
-                lda #0          ;indicate workspace unavailable
-+
+unexpected_fs_info_addr:
+                lda #0
                 sta $df0,x
-                iny             ;claim 1 page
-                jmp unclaimed
-                
+                beq unclaimed   ;i.e., JMP
+
 help:
                 tya
                 pha
@@ -622,6 +633,12 @@ print_help_banner .proc
                 
                 .endproc
 
+fs_info_block:
+                .text '*'       ;extremely bogus...
+                .fill 7,' '
+                .text 1,2,1     ;CFS values
+
+                
 ;-------------------------------------------------------------------------
 
 help_adji: .proc
@@ -1254,7 +1271,7 @@ master_loop:
                 ; Fix up workspace page.
                 tay
                 lda $df0,y
-                ldy #overlay_master.workspace_page
+                ldy #overlay_master.hazel_offset
                 sta (strtoi_value),y
 
                 ; Point BYTEV to the right place.
@@ -1820,7 +1837,7 @@ osbyte_entry_offset=*-overlay_master
 rom_offset=*+1-overlay_master
                 lda #$ff
                 sta $fe30
-workspace_page=*+1-overlay_master
+hazel_offset=*+1-overlay_master
                 lda #$ff
                 jmp handle_overlay_master
                 .endblock
@@ -1838,12 +1855,12 @@ workspace_page=*+1-overlay_master
 ;        Stack = [A, P, OSBYTE ret]
 ; 
 handle_overlay_master:
-                ; Store workspace address MSB.
-                sta os_seiwk+1
+                ; Store workspace address LSB.
+                sta os_seiwk+0
 
                 ; Save input A.
                 pla
-                sta os_seiwk+0
+                sta os_seiwk+1
 
                 ; Save input P.
                 pla
@@ -1868,10 +1885,7 @@ handle_overlay_master:
                 pha
 
                 ; Reinstate input A.
-                lda os_seiwk+0
-
-                ; Form workspace address in (os_seiwk).
-                stz os_seiwk+0
+                lda os_seiwk+1
 
                 jmp handle_osbyte_master
 
@@ -1908,8 +1922,9 @@ handle_osbyte_xvector_master: .proc
                 phx
                 ldx $f4
                 lda $df0,x
+                sta os_seiwk+0
+                lda #>hazel_state_addr
                 sta os_seiwk+1
-                stz os_seiwk+0
                 plx
                 pla
                 jmp handle_osbyte_master
@@ -1929,8 +1944,9 @@ handle_keyv_xvector_master: .proc
                 phx
                 ldx $f4
                 lda $df0,x
+                sta os_seiwk+0
+                lda #>hazel_state_addr
                 sta os_seiwk+1
-                stz os_seiwk+0
                 plx
                 pla
                 jmp keyv_master
@@ -1956,6 +1972,10 @@ handle_osbyte_master: .proc
                 sta os_a
                 stx os_x
                 sty os_y
+
+                ; Form workspace address in (os_seiwk)
+                ldx #>hazel_state_addr
+                stx os_seiwk+1
 
                 cmp #$80
                 beq osbyte_80_master
@@ -2098,7 +2118,7 @@ try_osbyte:
                 pla             ;[P TL TH P RL RH]
                 sta acccon
                 
-                lda os_seiwk+1
+                lda os_seiwk+0
                 plp             ;Restore IRQ state [TL TH P RL RH]
                 pha             ;Save workspace ptr MSB [WH TL TH P RL RH]
 
@@ -2122,8 +2142,9 @@ try_osbyte:
                 ; Restore state.
                 pla             ;Restore workspcae ptr MSB [TL TH P RL RH]
                 sei
+                sta os_seiwk+0
+                lda #>hazel_state_addr
                 sta os_seiwk+1
-                stz os_seiwk+0
 
 next:
                 ; Decrement timeout, and keep going until 0.
@@ -2261,6 +2282,10 @@ scan:
                 sta os_a
                 sty os_y
                 
+                ; Form workspace address in (os_seiwk)
+                lda #>hazel_state_addr
+                sta os_seiwk+1
+
                 ; Check for keyboard scan mode.
                 txa
                 bpl scan_multiple_keys ;taken if scanning for multiple
@@ -2327,7 +2352,7 @@ pressed:
                 
 scan_multiple_keys: .block
                 phx
-                lda os_seiwk+1
+                lda os_seiwk+0
                 pha
                 sec
                 clv
@@ -2339,9 +2364,10 @@ scan_multiple_keys: .block
                 ; Restore old state: IRQs disabled, os_seiwk set up,
                 ; os_x as per entry.
                 sei
-                stz os_seiwk+0
-                pla
+                lda #>hazel_state_addr
                 sta os_seiwk+1
+                pla
+                sta os_seiwk+0
                 pla
                 sta os_x
 
@@ -2424,8 +2450,9 @@ setup_acccon_master: .proc
 
                 ldx $f4
                 lda $df0,x
+                sta os_seiwk+0
+                lda #>hazel_state_addr
                 sta os_seiwk+1
-                stz os_seiwk+0
 
                 pla
                 plx
@@ -2793,7 +2820,29 @@ error:
                 .section read_or_write_state_workspace
 state_ptr: .fill 2
                 .endsection
-                
+
+;-------------------------------------------------------------------------
+;
+; Set up state_ptr for the Master.
+;
+; Exit: (state_ptr) = pointer to state in HAZEL
+; Preserves: A/X/Y/C
+set_up_state_ptr_master: .proc
+                .cpu '65c02'
+                pha
+                phx
+                ldx $f4
+                lda $df0,x
+                sta state_ptr+0
+                lda #>hazel_state_addr
+                sta state_ptr+1
+                plx
+                pla
+                rts
+                .cpu 'default'
+                rts
+                .endproc
+
 ;-------------------------------------------------------------------------
 ;
 ; Read 1 byte from the ROM state.
@@ -2813,15 +2862,8 @@ electron:
                 rts
 
 master:
-                .cpu '65c02'
-                phx
-                ldx $f4
-                lda $df0,x
-                sta state_ptr+1
-                stz state_ptr+0
-                plx
+                jsr set_up_state_ptr_master
                 lda (state_ptr),y
-                .cpu 'default'
                 rts
                 .endproc
 
@@ -2844,18 +2886,9 @@ electron:
                 rts
 
 master:
-                .cpu '65c02'
-                pha
-                phx
-                ldx $f4
-                lda $df0,x
-                sta state_ptr+1
-                stz state_ptr+0
-                plx
-                pla
+                jsr set_up_state_ptr_master
                 sta (state_ptr),y
                 rts
-                .cpu 'default'
                 .endproc
 
 ;-------------------------------------------------------------------------
