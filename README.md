@@ -195,7 +195,11 @@ Keys specific to B/Master:
 
 ## Master 128
 
-The ROM uses 1 page of HAZEL to store its data.
+Filing systems get to store a few bytes of data in HAZEL to cooperate
+with the filing system switcher. The ROM does this, and stores its
+state in that area.
+
+The filing system it pretends to be is impossible to select.
 
 ## Electron
 
