@@ -83,6 +83,6 @@ rel:
 	$(DIRTY_CHECK_PREFIX)$(_V)git diff-files --quiet
 	$(_V)$(MAKE) build
 	$(_V)$(SHELLCMD) blank-line
-	$(_V)$(PYTHON) $(BEEB_BIN)/ssd_create.py -o "$(SSD_PATH)" "$(BEEB_BUILD)/$$.ADJIROM" "$(BEEB_BUILD)/D.ADJIROM"
-	$(_V)zip -9j "$(ZIP_PATH)" "$(BUILD)/ADJIROM.bin" "$(BUILD)/ADJIROM_debug.bin" "$(SSD_PATH)"
+	$(_V)$(PYTHON) $(BEEB_BIN)/ssd_create.py -o "$(SSD_PATH)" "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
+	$(_V)zip -9j "$(ZIP_PATH)" "$(BUILD)/ADJIROM.bin" "$(BUILD)/ADJIROM_debug.bin" "$(BUILD)/ADJIROM_1fire.bin" "$(BUILD)/ADJIROM_1fire_debug.bin" "$(SSD_PATH)"
 	$(_V)echo ZIP file: $(ZIP_PATH)
