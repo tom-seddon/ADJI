@@ -2278,15 +2278,15 @@ osbyte_81_master: .proc
                 ; Go to timeout case if Y<$80
                 bpl timeout
 
-                ; Call default OSBYTE if Y!=$ff
+                ; Y>=$80 means keyboard scan - unless Y=$ff and X=$00,
+                ; in which case it's machine detection, for which
+                ; defer to default osbyte.
+                cpx #$00
+                bne +
                 cpy #$ff
-                bne jmp_default_osbyte.with_p_already_pushed
-
-                ; Call default OSBYTE for the X=$00 Y=$FF version
-                ; call.
-                cpx #0
                 beq jmp_default_osbyte.with_p_already_pushed
-
++
+                
                 ; Is this one of the jkeys?
                 lda acccon
                 pha
