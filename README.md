@@ -109,9 +109,12 @@ up the same settings non-interactively (e.g., from `!BOOT` or a loader
 program).
 
 The `*JSETUP` settings will persist across a SHIFT+BREAK or BREAK if
-you do it straight away after `*JSETUP`. After running a game, they
-might not survive a subsequent BREAK, even if the joystick was working
-fine in game - the state has to be stored
+you do it straight away after `*JSETUP`. Note that after running a
+game, they might not survive a subsequent BREAK, even if the joystick
+was working fine in game.
+
+`*HELP ADJI` will print `(active)` or `(inactive)` to indicate the
+ADJI joystick status.
 
 ## `*JOFF` - switch digital joystick support off
 

@@ -65,7 +65,10 @@ elk_persistent_state=$39f
 
 ; Placeholder OSBYTE used to indicate that the ROM is actually being
 ; entered due to KEYV.
-keyv_osbyte=83
+keyv_osbyte_number=83
+
+; Used to detect presence of ADJI hooks.
+presence_osbyte_number=84
 
 ;-------------------------------------------------------------------------
 
@@ -700,6 +703,25 @@ print_help_banner .proc
                 iny
                 cpy #rom_copyright-rom_header
                 bne -
+
+                txa
+                pha
+                lda #presence_osbyte_number
+                jsr osbyte
+                cpx #'A'
+                bne inactive
+active:
+                jsr print_following_string
+                .text ' (active)',0
+done:
+                pla
+                tax
+                rts
+inactive:
+                jsr print_following_string
+                .text ' (inactive)',0
+                pla
+                tax
                 rts
                 
                 .endproc
@@ -1611,7 +1633,7 @@ done:
 
 overlay_electron: .block
 keyv_entry_offset=*-overlay_electron
-                lda #keyv_osbyte
+                lda #keyv_osbyte_number
 osbyte_entry_offset=*-overlay_electron
                 php             ;P RetL RetH
                 sei
@@ -1691,7 +1713,7 @@ handle_overlay_exit_electron:
 handle_osbyte_electron: .proc
                 ; Don't use the OSBYTE zero page yet - this call might
                 ; be KEYV.
-                cmp #keyv_osbyte
+                cmp #keyv_osbyte_number
                 bne is_osbyte
                 jmp keyv_electron
 
@@ -1707,6 +1729,9 @@ is_osbyte:
 
                 cmp #$81
                 beq osbyte_81_electron
+
+                cmp #presence_osbyte_number
+                beq osbyte_presence_generic
 
 unhandled:
                 ldx os_x
@@ -2057,7 +2082,7 @@ next:
 overlay_master: .block
                 .cpu '65c02'
 keyv_entry_offset=*-overlay_master
-                lda #keyv_osbyte
+                lda #keyv_osbyte_number
 osbyte_entry_offset=*-overlay_master
                 php
                 sei
@@ -2193,7 +2218,7 @@ handle_keyv_xvector_master: .proc
 handle_osbyte_master: .proc
                 ; Don't use the OSBYTE zero page yet - it might be
                 ; KEYV, possibly called from an interrupt context.
-                cmp #keyv_osbyte
+                cmp #keyv_osbyte_number
                 beq keyv_master
 
                 ; This is OSBYTE.
@@ -2210,6 +2235,9 @@ handle_osbyte_master: .proc
 
                 cmp #$81
                 beq osbyte_81_master
+
+                cmp #presence_osbyte_number
+                beq osbyte_presence_generic
 unhandled:
                 ldx os_x
                 ldy os_y
@@ -2490,7 +2518,7 @@ default:
 ;
 ; KEYV handler for Master 128.
 ;
-; Entry: A = keyv_osbyte
+; Entry: A = keyv_osbyte_number
 ;        X, Y = KEYV arguments
 ;        (os_seiwk) = pointer to workspace in HAZEL
 ;        IRQs disabled
@@ -2779,6 +2807,23 @@ shiftl_oswrch: .proc
                 lsr a
                 php
                 jsr oswrch
+                plp
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Handle presence OSBYTE.
+;
+; Entry: A = presence_osbyte_number
+;        X/Y = whatever
+;        Stack = [P RetL RetH]
+osbyte_presence_generic: .proc
+                ldy #State.jflags
+                jsr read_state
+                tay
+                ldx #'A'
+                lda #presence_osbyte_number
                 plp
                 rts
                 .endproc
