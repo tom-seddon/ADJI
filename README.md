@@ -108,6 +108,11 @@ finish. Last thing it does is print a `*JKEYS` (see below) or `*JJOY`
 up the same settings non-interactively (e.g., from `!BOOT` or a loader
 program).
 
+The `*JSETUP` settings will persist across a SHIFT+BREAK or BREAK if
+you do it straight away after `*JSETUP`. After running a game, they
+might not survive a subsequent BREAK, even if the joystick was working
+fine in game - the state has to be stored
+
 ## `*JOFF` - switch digital joystick support off
 
 No parameters required.
@@ -120,6 +125,8 @@ No parameters required.
 2. Overlay address (precede with `&` if in hex), or `X` to use
    extended vectors
 
+The settings will persist across a soft BREAK as per `*JSETUP`.
+
 ## `*JKEYS` - use the digital joystick as keys
 
 `*JKEYS` takes 7 parameters, with all keys specified as negative INKEY
@@ -131,11 +138,13 @@ values:
 4. Key for left
 5. Key for right
 6. Key for fire button 1
-7. Key for fire button 2
+7. Key for fire button 2 (ignored if using the `1F` ROM)
 8. Overlay address or `X', as above
 
 Easiest thing to do is use `*JSETUP`, which will prompt you for the
 keys and print a command line you can use again.
+
+The settings will persist across a soft BREAK as per `*JSETUP`.
 
 Negative INKEY values are as follows. Keys common to all systems:
 
@@ -233,16 +242,22 @@ by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or `lda
 1 MHz bus, so you might want to save the old value of ACCCON and
 restore it afterwards.
 
-
 # Technical info
+
+There isn't tons of spare memory, so the ROM's state has to be
+squeezed in. Here's where it lives.
 
 ## Master 128
 
-Filing systems get to store a few bytes of data in HAZEL to cooperate
-with the filing system switcher. The ROM does this, and stores its
-state in that area.
+The ROM stores its state in a dummy filing system entry in HAZEL. This
+buys it a few bytes that are fairly unlikely to get overwritten.
 
-The filing system it pretends to be is impossible to select.
+It's impossible to select the filing system it pretends to be.
+
+To handle persistence across a BREAK, the following areas are also
+used:
+
+- &287-&289 (BREAK intercept routine) - xvector/overlay settings info
 
 ## Electron
 
@@ -254,12 +269,18 @@ One byte is used for flags:
 The remaining 6 are used when the joystick behaves as keys, to store
 the key assignments:
 
-- &02A8 - ROM flags for the keyboard's other ROM bank
-- &02A9 - ROM flags for the keyboard's ROM bank
-- &02AA - ROM flags for the BASIC ROM's other ROM bank
-- &02F5 - unused by Electron OS
-- &02F6 - unused by Electron OS
-- &027E - unused by Electron OS
+- &02A8 (ROM flags for the keyboard's other ROM bank)
+- &02A9 (ROM flags for the keyboard's ROM bank)
+- &02AA (ROM flags for the BASIC ROM's other ROM bank)
+- &02F5 (unused by Electron OS)
+- &02F6 (unused by Electron OS)
+- &027E (unused by Electron OS)
+
+To handle persistence across a BREAK, the following areas are also
+used:
+
+- &39F-&3A6 (unused by Electron OS) - copy of the ROM state above
+- &287-&289 (BREAK intercept routine) - xvector/overlay settings info
 
 # Compatibility notes
 

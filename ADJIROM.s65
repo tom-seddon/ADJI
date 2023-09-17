@@ -34,8 +34,30 @@ os_restore_rom_electron=$ff9c
 
 ;-------------------------------------------------------------------------
 
+osbyte_var: .function index
+                .cerror index<$a6||index>$ff,"bad OSBYTE"
+                .endf $190+index
+
+
 ; MOS variables
 os_tab_key_code=$26b            ;OSBYTE 219 ($db)
+
+; 3 bytes for storing off the xvector/overlay info, so it can persist
+; across BREAK.
+;
+; The first byte can't be $4c, but aside from that anything goes.
+os_break_intercept=$287
+
+os_last_break_type=osbyte_var($fd)
+
+; 8 unused bytes! What a gift.
+;
+; Unlike page 2, this area persists across BREAK... but it's also
+; overwritten by some games, so it's no good as working storage. So
+; the ROM uses it to save its 7 bytes of state, plus a checksum, and,
+; on boot, if the checksum matches, it reinitialises its working state
+; with these values.
+elk_persistent_state=$39f
                 
 ;-------------------------------------------------------------------------
 ;
@@ -54,7 +76,7 @@ rom_name:='ADJI'
 rom_name..=' (1F)'
                 .endif
                 .if debug
-rom_name..=' (debug)'
+rom_name..=' (debug) '..build_time
                 .endif
                 
 rom_ver='0.04'
@@ -93,9 +115,14 @@ action_keys: .fill num_actions
                 .endstruct
                 .cerror State.jflags!=0,'State jflags must be at offset 0'
 
-                ; The state has to fit in the 8 bytes reserved for the
-                ; Master 128 FS info block, and 1 byte is taken up by
-                ; the 1st char of the name.
+                ; The state has to fit into an 8-byte region.
+                ; 
+                ; On the Master, it has to go in the 8-byte name field
+                ; of an FS info block, with 1 byte taken up by the 1st
+                ; char of the name.
+                ;
+                ; On the Electron, it has to fit into the unused 8
+                ; bytes at $39f, with 1 byte taken up by a checksum.
                 .cerror size(State)>7,'State must be max 7 bytes'
 
 ;-------------------------------------------------------------------------
@@ -126,6 +153,7 @@ hazel_state_addr=$df00
 ; Also unused on Electron:
 ;
 ; $0261 - "speech suppression status" - unused in practice?
+; $027F - used by MRB
 ; $0282 - used by MRB??
 ; $028a - used by MRB??
 ; $028b - used by MRB??
@@ -254,7 +282,9 @@ rom_version:
                 .text rom_ver
 rom_copyright:
                 .byte 0
-                .text '(C) 2023 Retro Hardware'
+                .text '('
+sev_value:                      ;value with bit 6 set
+                .text 'C) 2023 RH'
 rom_copyright_end:
                 .byte 0
 ;-------------------------------------------------------------------------
@@ -297,17 +327,17 @@ cmds_offset=*-command_table
 
 help_table: .block
 jtest_offset=*-help_table
-                .text ' <no>'
+                .text ' <n>'
 none_offset=*-help_table
                 .text 0
 jjoy_offset=*-help_table
-                .text ' <no> X|<addr>',0
+                .text ' <n> X|<addr>',0
 jkeys_offset=*-help_table
-                .text ' <no> <up> <down> <left> <right> <fire1> '
+                .text ' <n> <u> <d> <l> <r> <f1> '
                 .if single_fire_button
-                .text '<dummy>'
+                .text '<?>'
                 .else
-                .text '<fire2>'
+                .text '<f2>'
                 .endif
                 .text ' X|<addr>',0
                 .endblock
@@ -325,9 +355,7 @@ errors_table: .block
 bad_hex_offset: .error_table_entry $fe,'Bad hex'
 incompatible_hw_offset: .error_table_entry $ff,'Electron/Master 128 only'
 bad_jno_offset: .error_table_entry $dc,'Bad joystick'
-no_free_hazel: .error_table_entry $ff,'No free FS RAM'
 bad_mode: .error_table_entry $ff,'Bad mode'
-todo_offset: .error_table_entry $ff,'TODO'
 unexpected_os: .error_table_entry $ff,'Unexpected Electron OS'
                 .endblock
                 
@@ -527,17 +555,41 @@ key_chars_table:
                 .section service
 ;-------------------------------------------------------------------------
 
+                .if debug
+svc_verbose=false
+                .else
+svc_verbose=false
+                .endif
+                
 svc: .proc
                 cmp #$15
                 beq done2       ;fast path for 100 Hz polling
                                 ;interrupt
                 pha
+                .if svc_verbose
+                lda #'['
+                jsr oswrch
+                pla
+                pha
+                jsr print_hex_byte
+                lda #']'
+                jsr oswrch
+                pla
+                pha
+                .endif
                 cmp #4
                 beq star
                 cmp #9
                 beq help
                 cmp #$25
                 beq store_fs_info
+
+                ; Tube post-init seems as good a way as any of hooking
+                ; into BREAK, regardless of ROM priority.
+                ;
+                ; On Master, it comes after the FS info is set up.
+                cmp #$fe
+                beq boot
 unclaimed:
                 pla
 done:
@@ -550,27 +602,48 @@ claimed:
                 lda #0
                 beq done    ;i.e., JMP
 
-store_fs_info:
-                tya             ;A=offset
+store_fs_info: .proc
                 .cpu '65c02'
+                ; V=0 for hard reset, V=1 for soft reset
+                clv
+                tya             ;A=offset
                 inc a           ;+1
-                .cpu 'default'
+
+                ; Always hard reset if not at the same location.
+                cmp $df0,x
                 sta $df0,x
+                bne reset
+
+                ; Always hard reset if not soft BREAK.
+                lda osbyte_var($fd)
+                bne reset
+
+                ; V=1 for soft reset
+                bit sev_value
+
+reset:
                 ldx #0
--
+loop:
+                bvc copy
+                
+                ; Don't overwrite the 7 state bytes.
+                cpx #fs_info_block.spare_begin
+                bcc copy
+                cpx #fs_info_block.spare_end
+                bcc next
+
+copy:
                 lda fs_info_block,x
                 sta ($f2),y
+next:
                 iny
                 inx
                 cpx #11
-                bne -
+                bne loop
                 jmp unclaimed
-
-unexpected_fs_info_addr:
-                lda #0
-                sta $df0,x
-                beq unclaimed   ;i.e., JMP
-
+                .cpu 'default'
+                .endproc
+                
 help:
                 tya
                 pha
@@ -630,14 +703,101 @@ print_help_banner .proc
                 rts
                 
                 .endproc
+
+boot: .proc
+                tya
+                pha
+                
+                lda os_last_break_type
+                beq maybe_boot  ;taken if soft BREAK
+
+                ; The policy is that power up or hard break cancels
+                ; the JJOY or JKEYS state state.
+                lda #0
+                sta os_break_intercept+0
+boot_done:
+                pla
+                tay
+                jmp unclaimed
+
+maybe_boot:
+                jsr is_valid_hw
+                bcc boot_done
+                bvs maybe_boot_2
+
+                ; Try to copy state from persistent area.
+                ldy #size(State)-1
+                lda #0
+                pha
+reinstate_loop:
+                pla
+                clc
+                adc elk_persistent_state+1,y
+                pha
+                lda elk_persistent_state+1,y
+                jsr write_state
+                dey
+                bpl reinstate_loop
+
+                pla
+                cmp elk_persistent_state+0
+                bne @b boot_done ;taken if persistent state is bogus
+
+maybe_boot_2:
+                ldy #State.jflags
+                jsr read_state
+                and #State.jflags.jkeys_mask|State.jflags.jjoy_mask
+                beq @b boot_done   ;taken if neither *JJOY nor *JKEYS
+
+                ldy #State.action_keys
+loop:
+                jsr read_state
+                bmi @b boot_done   ;taken if obviously invalid key
+                iny
+                cpy #State.action_keys+num_actions
+                bne loop
+
+                lda os_break_intercept+0
+                cmp #'X'
+                beq xvector
+
+overlay:
+                cmp #'O'
+                bne @b boot_done
+
+                lda os_break_intercept+2
+                sta strtoi_value+1
+                .if debug
+                jsr print_hex_byte
+                .endif
+                lda os_break_intercept+1
+                sta strtoi_value+0
+                .if debug
+                jsr print_hex_byte
+                .endif
+                jsr install_overlay
+                jmp boot_done
+
+xvector:
+                lda os_break_intercept+1
+                cmp #'X'
+                bne @b boot_done
+                lda os_break_intercept+2
+                cmp #'X'
+                bne @b boot_done
+                jsr install_xvector
+                jmp boot_done
+                .endproc
                 
                 .endproc
 
-fs_info_block:
+fs_info_block: .block
                 .text '*'       ;extremely bogus...
+spare_begin=*-fs_info_block
                 .fill 7,' '
+spare_end=*-fs_info_block
                 .text 1,2,1     ;CFS values
-
+                .endblock
                 
 ;-------------------------------------------------------------------------
 
@@ -714,6 +874,8 @@ yval: .fill 1
                 lda joystick_index
                 ora #State.jflags.jjoy_mask
                 jsr set_jflags
+
+                jsr elk_persist_state
                 
                 ldy yval
                 .fall_through_to handle_install_mode
@@ -742,6 +904,9 @@ index: .fill 1
 yval: .fill 1
 state_index: .fill 1
                 .endsection
+
+                jsr must_be_valid_hw
+                jsr reset_default_vectors
 
                 jsr parse_jno
                 sty yval
@@ -773,10 +938,12 @@ loop:
                 cpy #State.action_keys+num_actions
                 bne loop
 
+                jsr elk_persist_state
+
                 ldy yval
 
                 .if single_fire_button
-                ; Conside FIRE2 setting
+                ; Discard FIRE2 setting
                 jsr strtoi
                 .endif
                 
@@ -831,6 +998,7 @@ install:
                 eor #State.jflags.jjoy_mask|State.jflags.jkeys_mask
 +
                 jsr set_jflags
+                jsr elk_persist_state
                 lda use_overlay
                 beq install_xvector
                 jmp install_overlay
@@ -999,8 +1167,8 @@ jvalue: .fill 1
                 
                 jsr print_following_string
                 .text 22,135
-                .text 31,8,1
-                .text "J O Y S T I C K   T E S T"
+                .text 31,14,1
+                .text "JOYSTICK TEST"
                 .byte 0
 
                 jsr coff
@@ -1165,7 +1333,28 @@ next:
                 lda index
                 cmp #size(State)
                 bne loop
+
+                jsr print_following_string
+                .text 'KEYV=&',0
+
+                ldx #<keyv
+                jsr print_vector
+
+                jsr print_following_string
+                .text 10,13,'BYTEV=&',0
+
+                ldx #<bytev
+                jsr print_vector
+
+                jsr osnewl
+                
                 rts
+
+print_vector:
+                lda $201,x
+                jsr print_hex_byte
+                lda $200,x
+                jmp print_hex_byte
 
 char_name_key:
                 lda key_names_table,y
@@ -1249,7 +1438,7 @@ electron_loop:
                 ldx #overlay_electron.keyv_entry_offset
                 jsr maybe_set_overlay_keyv
 
-                rts
+                jmp note_overlay_address
 
 os_wut:
                 ldx #errors_table.unexpected_os
@@ -1281,6 +1470,14 @@ master_loop:
                 ; Maybe point KEYV to the right place.
                 ldx #overlay_master.keyv_entry_offset
                 jsr maybe_set_overlay_keyv
+
+note_overlay_address:
+                lda #'O'
+                sta os_break_intercept+0
+                lda strtoi_value+0
+                sta os_break_intercept+1
+                lda strtoi_value+1
+                sta os_break_intercept+2
 
                 rts
                 
@@ -1317,10 +1514,10 @@ install_xvector: .proc
                 .section install_xvector_workspace
 xvectors: .fill 2
                 .endsection
-                lda #$a8        ;read extended vector table address
-                jsr osbyte_x00_yff
-                stx xvectors+0
-                sty xvectors+1
+                lda osbyte_var($a8)
+                sta xvectors+0
+                lda osbyte_var($a9)
+                sta xvectors+1
 
                 jsr must_be_valid_hw
                 ldx #0          ;assume Master
@@ -1363,6 +1560,11 @@ xvectors: .fill 2
                 lda $f4
                 sta (xvectors),y
 keyv_done:
+
+                lda #'X'
+                sta os_break_intercept+0
+                sta os_break_intercept+1
+                sta os_break_intercept+2
                 
                 plp
                 rts
@@ -1380,6 +1582,31 @@ keyv_values:
                 .endsection common
 ;-------------------------------------------------------------------------
                 .section electron_only
+;-------------------------------------------------------------------------
+; 
+; Save Electron state
+;
+; Preserves: X
+; 
+elk_persist_state: .proc
+                .cerror size(State)>7,'oops'
+                jsr is_valid_hw
+                bvs done        ;skip when Master
+                lda #0
+                sta elk_persistent_state+0
+                ldy #size(State)-1
+loop:
+                jsr read_state
+                sta elk_persistent_state+1,y
+                clc
+                adc elk_persistent_state+0
+                sta elk_persistent_state+0
+                dey
+                bpl loop
+done:
+                rts
+                .endproc
+
 ;-------------------------------------------------------------------------
 
 overlay_electron: .block
@@ -1480,6 +1707,7 @@ is_osbyte:
 
                 cmp #$81
                 beq osbyte_81_electron
+
 unhandled:
                 ldx os_x
 unhandled_got_x:
@@ -2704,7 +2932,8 @@ keys_loop:
                 ora #$80        ;form true INKEY number
                 tax
                 lda #$81
-                jsr osbyte_yff
+                ldy #$ff
+                jsr osbyte
                 pla             ;restore INKEY number
                 
                 cpx #$ff        ;C=1 if pressed
@@ -2788,7 +3017,7 @@ electron:
                 clv
                 bvc done        ;i.e., JMP
 master:
-                bit $8003       ;set V - there's a $4c there
+                bit sev_value
 done:
                 pla
                 tay
@@ -2917,6 +3146,14 @@ rdv_ptr: .fill 2
 
                 ldy #<keyv
                 jsr restore_default_vector
+
+                lda #0
+                sta os_break_intercept+0
+
+                ldy #State.jflags
+                jsr read_state
+                and #~(State.jflags.jjoy_mask|State.jflags.jkeys_mask)
+                jsr write_state
 
                 pla
                 tay
@@ -3239,22 +3476,6 @@ nybble:
                 adc #$40
                 cld
                 jmp oswrch
-                .endproc
-                
-;-------------------------------------------------------------------------
-;
-; Call OSBYTE with X=$00 Y=$FF
-;
-osbyte_x00_yff: .proc
-                ldx #0
-                .fall_through_to osbyte_yff
-                .endproc
-osbyte_yff: .proc
-                ldy #$ff
-                .fall_through_to jmp_osbyte
-                .endproc
-jmp_osbyte: .proc
-                jmp osbyte
                 .endproc
                 
 ;-------------------------------------------------------------------------
