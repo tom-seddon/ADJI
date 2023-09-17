@@ -30,14 +30,15 @@ will suggest `0`.
 ## `*JTEST` - test the joystick
 
 To test it out, use `*JTEST`. This takes one parameter: the joystick
-number, 1-4, corresponding to the DIP switches on the device.
+number, 1-4, corresponding to the DIP switch settings on the cartridge
+(D = Down, U = Up).
 
-| Number | Address |
+| Number | Switches |
 | --- | --- |
-| 1 | &FCC0 |
-| 2 | &FCD0 |
-| 3 | &FCE0 |
-| 4 | &FCF0 |
+| 1 | D D |
+| 2 | U D |
+| 3 | D U |
+| 4 | U U |
 
 The joystick test screen reads the joystick, and shows on screen which
 directions and/or buttons are being pressed.
@@ -190,6 +191,48 @@ Keys specific to B/Master:
   
 - `*JJOY` effectively disables both analogue joysticks, even though it
   could pass through to one of them and it wouldn't interfere
+
+# Using the ADJI from code
+
+The joystick appears as a single byte in page &FC, location depending
+on the DIP switch settings. The relationship between joystick number
+(as per `*JSETUP`, etc.), DIP switches and address is as follows:
+
+| Number | Address | Switches |
+| --- | --- | --- |
+| 1 | &FCC0 | D D |
+| 2 | &FCD0 | U D |
+| 3 | &FCE0 | D U |
+| 4 | &FCF0 | U U |
+
+The value read is a 6-bit quantity, bits as follows. Each used bit is
+set if the corresponding button is pressed, or the joystick is moved
+in that direction.
+
+(You `Raw value` shown in the `*JTEST` output will show the exact
+value read.)
+
+| Bit | What |
+| --- | --- |
+| 7   | Unused (ignore) |
+| 6   | Unused (ignore) |
+| 5   | Fire 2 |
+| 4   | Fire 1 |
+| 3   | Right |
+| 2   | Left |
+| 1   | Down |
+| 0   | Up |
+
+On the Electron, you can read the value directly. `A%=?&FCC0` from
+BASIC, for example, to read the joystick state into `A%`. Or something
+like `lda &FCC0` from assembly language.
+
+On the Master, page &FC needs to be redirected to the cartridge first,
+by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or `lda
+#&20:tsb &FE34`. This may interfere with any devices connected to the
+1 MHz bus, so you might want to save the old value of ACCCON and
+restore it afterwards.
+
 
 # Technical info
 
