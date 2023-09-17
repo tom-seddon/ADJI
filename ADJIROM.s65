@@ -82,7 +82,7 @@ rom_name..=' (1F)'
 rom_name..=' (debug) '..build_time
                 .endif
                 
-rom_ver='0.05'
+rom_ver='0.04'
 
 default_overlay_address=$150
                 
