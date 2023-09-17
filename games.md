@@ -52,6 +52,9 @@ Not compatible with either `*JKEYS` or `*JJOY`.
 
 ## Not working
 
+Doesn't behave properly, but for reasons unknown. Might not be
+compatible, might just need modification.
+
 | Game | Issue |
 | --- | --- |
 | Boffins 2| https://github.com/tom-seddon/ADJI/issues/25|
@@ -59,6 +62,8 @@ Not compatible with either `*JKEYS` or `*JJOY`.
 | Camelot| https://github.com/tom-seddon/ADJI/issues/27|
 | Citadel| https://github.com/tom-seddon/ADJI/issues/28|
 | Croaker| https://github.com/tom-seddon/ADJI/issues/29|
+| Cyborg Warriors|https://github.com/tom-seddon/ADJI/issues/34|
+
 
 # Master
 
