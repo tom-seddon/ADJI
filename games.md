@@ -71,6 +71,18 @@ compatible, might just need modification.
 
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
+| Tenebra | *JKEYS 1 &EF &BE &C9 &C8 &9D &B6 X | Y | N/A | N | No native joystick option |
+| YieArKungFu | *JKEYS 1 &B7 &97 &9E &BD &B6 &FF X | Y | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
+| YieArKungFu II | *JKEYS 1 &B7 &97 &9E &BD &B6 &FF &0150 | N | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
+| Felix in the Factory | *JKEYS 1 &B7 &97 &9E &BD &B6 &9F &0150 | N | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
+| Nubium | *JKEYS &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
+| Nubium II | *JKEYS &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
+| Repton 3 Redux | N/A | N/A | *JJOY 1 X | Y |  |
+| Repton The Lost Realms | N/A | N/A | *JJOY 1 X | Y |  |
+| BubbleBobble | *JKEYS  1 &B7 &97 &DE &DD &9F &FE X | Y | N/A | N/A | No native joystick option |
+| ChuckieEgg Professional Edition | N/A | N/A | *JJOY 1 &0880 | N | Has native joystick but needs overlay at &880 |
+| Hobgobblin | *JKEYS  1 &B7 &97 &9E &BD &9D &0880 | N | N/A | N/A | No native joystick option |
+| Hobgobblin II | *JKEYS  1 &B7 &97 &9E &BD &9D &0880 | N | N/A | N/A | No native joystick option |
 
 ## Requires modification
 
@@ -79,11 +91,18 @@ compatible, might just need modification.
 
 ## Not compatible
 
-| Game | Reason |
-| --- | --- |
+| Game | Reason | Notes |
+| --- | --- | --- | 
 | Astro Blaster | Accesses hardware directly |
 | Prince of Persia | Uses all the memory |
 | White Light | Accesses hardware directly |
+| Electrobots | TBC |
+| Mr EE | TBC | This game has glitches on master anyway, but JKEYS and JJOY only have partial success |
+| Strykers Run | TBC | Hangs on menu screen |
+| Electrobots Going Underground | TBC | Accesses hardware directly? |
+| Soko-ban | | | 
+| Night Ninja | |  | 
+| Quak NULA Version | |  | 
 
 ## Not working
 
