@@ -264,8 +264,8 @@ struct_section: .macro
 debug_data:
                 .cerror *>$c000,'debug overflow'
                 .else
-                ; The real ADJI ROM is 4 KB.
-                .cerror *>$9000,'code overflow'
+                ; The real ADJI ROM is 8 KB.
+                .cerror *>$a000,'code overflow'
                 .endif
                 
 ;-------------------------------------------------------------------------
