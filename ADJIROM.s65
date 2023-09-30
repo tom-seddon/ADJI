@@ -30,6 +30,7 @@ os_auto_repeat_period=$255
 ; Routines that do PLA:<<restore ROM>>:PLA:PLP:RTS - as is part of the
 ; extended vector handling mechanism.
 os_restore_rom_master=$ffa4
+os_restore_rom_b=$ff9e
 os_restore_rom_electron=$ff9c
 
 ;-------------------------------------------------------------------------
@@ -287,7 +288,7 @@ rom_copyright:
                 .byte 0
                 .text '('
 sev_value:                      ;value with bit 6 set
-                .text 'C) 2023 RH'
+                .text 'C) 2023 Retro Hardware'
 rom_copyright_end:
                 .byte 0
 ;-------------------------------------------------------------------------
@@ -729,7 +730,18 @@ inactive:
 boot: .proc
                 tya
                 pha
-                
+
+                ; If this is a Master 128 with OS 1.20/OS 2.00, the FS
+                ; info call didn't happen. Pretend it did.
+                jsr is_master_with_B_os
+                bcc check_boot_type
+
+                ; $49 is the value the entry ends up in on my Master
+                ; by default. As good a place as any.
+                lda #$49
+                sta $df0,x
+
+check_boot_type:
                 lda os_last_break_type
                 beq maybe_boot  ;taken if soft BREAK
 
@@ -2158,7 +2170,33 @@ handle_overlay_exit_master:
                 pla             ;S = | X P A P RetL RetH
                 sta $102,x      ;S = | X ROMSEL A P RetL RetH
                 plx             ;S = ROMSEL A P RetL RetH
+
+; MOS 3.20/MOS 3.50: (actual JMP addresses differ)
+;
+; .ff9f         68              pla      
+; .ffa0         68              pla      
+; .ffa1         20 b0 ed        jsr $edb0
+; .ffa4         68              pla      
+; .ffa5         20 92 e5        jsr $e592
+; .ffa8         68              pla      
+; .ffa9         28              plp      
+; .ffaa         60              rts
+; 
+; OS 1.20/OS 2.00:
+;
+; FF9E    PLA         ;get back A ROM number
+; FF9F    STA &F4     ;store it
+; FFA1    STA &FE30   ;and set it
+; FFA4    PLA         ;get back A
+; FFA5    PLP         ;get back flags
+; FFA6    RTS         ;return and exit pulling original return address
+                    ;from stack
+
+                bit $ffa0       ;MOS=$68, OS=$f4
+                bmi b
                 jmp os_restore_rom_master
+b:
+                jmp os_restore_rom_b
                 .cpu 'default'
 
 ;-------------------------------------------------------------------------
@@ -3030,7 +3068,52 @@ string_name_loop:
                 bcc string_name_loop
                 rts
                 .endproc
+
+;-------------------------------------------------------------------------
+;
+; https://beebwiki.mdfs.net/OSBYTE_%2600
+;
+; Exit: X = OS type
+; Preserves: Y
+get_os_type: .proc
+                lda #0
+                ldx #1
+                jmp osbyte
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Exit: C=1 if Master with OS 1.20/OS 2.00
+;       C=0 if other
+; Preserves: A/X/Y
+is_master_with_B_os: .proc
+                pha
+                txa
+                pha
+                tya
+                pha
                 
+                jsr is_valid_hw
+                bcc done
+                bvc other
+
+                jsr get_os_type
+                cpx #1
+                beq done
+                cpx #2
+                beq done
+
+other:
+                clc
+done:
+                pla
+                tay
+                pla
+                tax
+                pla
+                rts
+                .endproc
+
 ;-------------------------------------------------------------------------
 ;
 ; Return value indicating whether hardware type is valid.
@@ -3046,22 +3129,27 @@ is_valid_hw: .proc
                 pha
                 tya
                 pha
-                ; https://beebwiki.mdfs.net/OSBYTE_%2600
-                lda #0
-                ldx #1
-                jsr osbyte
+                jsr get_os_type
                 cpx #0
                 beq electron
                 cpx #3
-                beq master
+                bcs master
+
+                ; Master+hacked B/B+ OS?
+                lda $fe34       ;will read $fe on B/B+
+                cmp #$fe
+                bne master
+                
                 ; Not valid
                 clc
                 jmp done
 
 electron:
+                sec
                 clv
                 bvc done        ;i.e., JMP
 master:
+                sec                
                 bit sev_value
 done:
                 pla
@@ -3136,9 +3224,22 @@ electron:
                 rts
 
 master:
+                .cpu '65c02'
                 jsr set_up_state_ptr_master
+                php
+                sei
+                lda acccon
+                pha
+                lda #acccon.y
+                tsb acccon
                 lda (state_ptr),y
+                sta os_seia
+                pla
+                sta acccon
+                lda os_seia
+                plp
                 rts
+                .cpu 'default'
                 .endproc
 
 ;-------------------------------------------------------------------------
@@ -3160,9 +3261,23 @@ electron:
                 rts
 
 master:
+                .cpu '65c02'
                 jsr set_up_state_ptr_master
+                php
+                sei
+                sta os_seia
+                lda acccon
+                pha
+                lda #acccon.y
+                tsb acccon
+                lda os_seia
                 sta (state_ptr),y
+                pla
+                sta acccon
+                lda os_seia
+                plp
                 rts
+                .cpu 'default'
                 .endproc
 
 ;-------------------------------------------------------------------------
