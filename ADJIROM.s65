@@ -2292,8 +2292,6 @@ osbyte_81_master: .proc
                 pha
                 lda #acccon.ifj|acccon.y
                 tsb acccon
-                lda #1
-                sta os_y
                 ldy #State.action_keys
 
 poll_key_loop:
@@ -2304,16 +2302,14 @@ poll_key_loop:
 
                 lda (os_seiwk)
                 and #3
-                phy
-                tay
-                ldx joystick_fred_offsets,y
-                ply
+                tax
+                lda joystick_fred_offsets,x
+                tax
                 lda $fc00,x
-                and os_y
+                and joystick_actions.masks-State.action_keys,y
                 bne found_key
                 
 poll_next_key:
-                asl os_y
                 iny
                 cpy #State.action_keys+num_actions
                 bne poll_key_loop
