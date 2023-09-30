@@ -6,4 +6,5 @@ $.YBIT diff=bbcbasic
 $.INPTEST diff=bbcbasic
 $.FINDINMOS diff=bbcbasic
 $.81TEST diff=bbcbasic
+$.LOADER diff=bbcbasic
 $.ADJIBUG diff=bbcbasic
