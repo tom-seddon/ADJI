@@ -2296,11 +2296,23 @@ osbyte_81_master: .proc
                 sta os_y
                 ldy #State.action_keys
 
+poll_key_loop:
                 lda os_x
                 eor #$ff        ;convert to internal key
-poll_key_loop:
                 cmp (os_seiwk),y
-                beq found_key
+                bne poll_next_key
+
+                lda (os_seiwk)
+                and #3
+                phy
+                tay
+                ldx joystick_fred_offsets,y
+                ply
+                lda $fc00,x
+                and os_y
+                bne found_key
+                
+poll_next_key:
                 asl os_y
                 iny
                 cpy #State.action_keys+num_actions
@@ -2316,14 +2328,6 @@ not_found_key:
                 jmp jmp_default_osbyte.with_p_already_pushed
 
 found_key:
-                lda (os_seiwk)
-                and #3
-                tay
-                ldx joystick_fred_offsets,y
-                lda $fc00,x
-                and os_y
-                beq not_found_key
-
                 pla
                 sta acccon
                 ldx #$ff
