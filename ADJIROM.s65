@@ -191,7 +191,8 @@ jall_fire_mask=jfire1_mask|jfire2_mask
                 .endif
                 
 jall_mask=jall_fire_mask|jright_mask|jleft_mask|jdown_mask|jup_mask
-                
+
+fred_offsets=[$c0,$d0,$e0,$f0]
                 
 ;-------------------------------------------------------------------------
 
@@ -256,6 +257,7 @@ struct_section: .macro
                 .dsection master_only
                 .dsection electron_only
                 .dsection library
+                .dsection big_tables
                 
                 .if debug
                 .dsection debug
@@ -407,7 +409,7 @@ elk_state_offsets: .proc
                 .endproc
                 
 joystick_fred_offsets:
-                .byte $c0,$d0,$e0,$f0
+                .byte fred_offsets
 
 ;-------------------------------------------------------------------------
 
@@ -424,7 +426,10 @@ xo=*-questions_table
                 .endproc
 
 ;-------------------------------------------------------------------------
-
+                .endsection tables
+;-------------------------------------------------------------------------
+                .section big_tables
+;-------------------------------------------------------------------------
 ; copied from MOS 3.20
 key_chars_table:
                 .text "Q"                    ;10 q
@@ -552,9 +557,15 @@ key_chars_table:
                 nop
                 nop
                 .cerror *-key_chars_table!=112,'oops'
-
 ;-------------------------------------------------------------------------
-                .endsection tables
+                .align 256
+joystick_fred_offsets_by_jflags:
+                .for i=0,i<256,i+=1
+                .byte fred_offsets[i&State.jflags.jindex_mask]
+                .endfor
+                
+;-------------------------------------------------------------------------
+                .endsection big_tables
 ;-------------------------------------------------------------------------
                 .section service
 ;-------------------------------------------------------------------------
@@ -1802,10 +1813,8 @@ not_found_key:
                 jmp jmp_default_osbyte.with_p_already_pushed
 
 found_key:
-                lda elk_jflags
-                and #3
-                tay
-                lda joystick_fred_offsets,y
+                ldy elk_jflags
+                lda joystick_fred_offsets_by_jflags,y
                 tay
                 lda $fc00,y
                 and joystick_actions.masks,x
@@ -1966,10 +1975,8 @@ escan:
                 and #$7f        ;internal key number
                 sta os_seiwk+0
 
-                lda elk_jflags
-                and #State.jflags.jindex_mask
-                tay
-                ldx joystick_fred_offsets,y
+                ldy elk_jflags
+                ldx joystick_fred_offsets_by_jflags,y
                 ldy $fc00,x
 
                 ldx os_seiwk+0  ;internal key number
@@ -2046,10 +2053,8 @@ escan_multiple_keys:
                 ; Save KEYV result - max key.
                 stx os_seiwk+1
 
-                lda elk_jflags
-                and #State.jflags.jindex_mask
-                tay
-                ldx joystick_fred_offsets,y
+                ldy elk_jflags
+                ldx joystick_fred_offsets_by_jflags,y
                 lda $fc00,x
                 sta os_seia     ;joystick state
 
@@ -2332,16 +2337,18 @@ osbyte_81_master: .proc
                 tsb acccon
                 ldy #State.action_keys
 
-poll_key_loop:
                 lda os_x
                 eor #$ff        ;convert to internal key
+                sta os_x
+
+poll_key_loop:
+                lda os_x
                 cmp (os_seiwk),y
                 bne poll_next_key
 
                 lda (os_seiwk)
-                and #3
                 tax
-                lda joystick_fred_offsets,x
+                lda joystick_fred_offsets_by_jflags,x
                 tax
                 lda $fc00,x
                 and joystick_actions.masks-State.action_keys,y
@@ -2355,9 +2362,11 @@ not_found_key:
                 pla
                 sta acccon
 
+                lda os_x
+                eor #$ff        ;convert back to INKEY
+                tax
                 lda #$81
                 ldy #$ff
-                ldx os_x
                 
                 jmp jmp_default_osbyte.with_p_already_pushed
 
