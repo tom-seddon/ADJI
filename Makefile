@@ -14,6 +14,7 @@ PWD:=$(shell $(PYTHON) submodules/shellcmd.py/shellcmd.py realpath .)
 SHELLCMD:=$(PYTHON) "$(PWD)/submodules/shellcmd.py/shellcmd.py"
 
 BUILD:=$(PWD)/build
+BIN:=$(PWD)/bin
 BEEB_BUILD:=$(PWD)/beeb/ADJI/z
 BEEB_BIN:=$(PWD)/submodules/beeb/bin
 
@@ -77,12 +78,15 @@ rel: GIT_VER:=$(shell git log -1 '--format=%cd-%h' '--date=format:%Y%m%d-%H%M%S'
 rel: SSD_PATH:=$(BUILD)/adji-$(GIT_VER).ssd
 rel: ZIP_PATH:=$(BUILD)/ADJI-$(GIT_VER).zip
 rel: DIRTY_CHECK_PREFIX:=$(if $(DIRTY_OK),-,)
+rel: ZIP_Q:=$(if $(VERBOSE),,-q)
 rel:
 	$(_V)echo Checking for unmodified working copy.
 	$(DIRTY_CHECK_PREFIX)$(_V)git diff-index --quiet --cached HEAD --
 	$(DIRTY_CHECK_PREFIX)$(_V)git diff-files --quiet
+	$(_V)$(MAKE) clean
 	$(_V)$(MAKE) build
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(PYTHON) $(BEEB_BIN)/ssd_create.py -o "$(SSD_PATH)" "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
-	$(_V)zip -9j "$(ZIP_PATH)" "$(BUILD)/ADJIROM.bin" "$(BUILD)/ADJIROM_debug.bin" "$(BUILD)/ADJIROM_1fire.bin" "$(BUILD)/ADJIROM_1fire_debug.bin" "$(SSD_PATH)"
+	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM.bin" -o "$(BUILD)"
+	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.bin ADJIROM.*.bin ADJIROM_debug.bin ADJIROM_1fire.bin ADJIROM_1fire_debug.bin "$(SSD_PATH)"
 	$(_V)echo ZIP file: $(ZIP_PATH)
