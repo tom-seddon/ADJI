@@ -408,9 +408,6 @@ elk_state_offsets: .proc
                 .endif
                 .endproc
                 
-joystick_fred_offsets:
-                .byte fred_offsets
-
 ;-------------------------------------------------------------------------
 
 questions_table: .proc
@@ -1834,10 +1831,8 @@ timeout:
                 sty elk_osbyte_81_timeout+1
 loop:
                 ; Read joystick
-                lda elk_jflags
-                and #3
-                tay
-                ldx joystick_fred_offsets,y
+                ldy elk_jflags
+                ldx joystick_fred_offsets_by_jflags,y
                 lda $fc00,x
                 and #jall_mask
                 beq try_osbyte  ;taken if obviously nothing pressed
@@ -1927,13 +1922,9 @@ osbyte_80_electron: .proc
                 bit elk_jflags
                 bvc handle_osbyte_electron.unhandled_got_x
 
-                ; Fetch joystick index.
-                lda elk_jflags
-                and #3
-
                 ; ?os_a = joystick value
-                tay
-                lda joystick_fred_offsets,y
+                ldy elk_jflags
+                lda joystick_fred_offsets_by_jflags,y
                 tay
                 lda $fc00,y
                 sta os_a
@@ -2396,9 +2387,8 @@ loop:
                 lda #acccon.ifj|acccon.y
                 tsb acccon
                 lda (os_seiwk)
-                and #3
                 tay
-                ldx joystick_fred_offsets,y
+                ldx joystick_fred_offsets_by_jflags,y
                 lda $fc00,x
                 and #jall_mask
                 beq try_osbyte  ;taken if obviously nothing pressed
@@ -2536,11 +2526,10 @@ osbyte_80_master: .proc
                 lda (os_seiwk),y
                 bit #State.jflags.jjoy_mask
                 beq default
-                and #3
 
                 ; ?os_a = joystick value
                 tay
-                lda joystick_fred_offsets,y
+                lda joystick_fred_offsets_by_jflags,y
                 tay
                 lda $fc00,y
                 sta os_a
@@ -2609,9 +2598,8 @@ scan_single_key: .block
                 lda (os_seiwk)
                 bit #State.jflags.jkeys_mask
                 beq default
-                and #3
                 tax
-                ldy joystick_fred_offsets,x
+                ldy joystick_fred_offsets_by_jflags,x
                 ldx $fc00,y
 
                 ldy #State.action_keys+num_actions-1
@@ -2682,9 +2670,8 @@ scan_multiple_keys: .block
 
                 ; Read joystick flags.
                 lda (os_seiwk)
-                and #3
                 tax
-                ldy joystick_fred_offsets,x
+                ldy joystick_fred_offsets_by_jflags,x
                 ldx $fc00,y
                 ldy #State.action_keys+num_actions-1
 loop:
@@ -3370,7 +3357,7 @@ read_joystick_master: .proc
                 pha
                 lda #acccon.ifj
                 tsb acccon
-                lda joystick_fred_offsets,x
+                lda joystick_fred_offsets_by_jflags,x
                 tax
                 lda $fc00,x
                 plx
@@ -3388,7 +3375,7 @@ read_joystick_master: .proc
 ; Exit: A = value read
 ; Preserves: Y
 read_joystick_elk:
-                lda joystick_fred_offsets,x
+                lda joystick_fred_offsets_by_jflags,x
                 tax
                 lda $fc00,x
                 rts
