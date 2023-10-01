@@ -8,3 +8,4 @@ $.FINDINMOS diff=bbcbasic
 $.81TEST diff=bbcbasic
 $.LOADER diff=bbcbasic
 $.ADJIBUG diff=bbcbasic
+$.DUMPHAZEL diff=bbcbasic
