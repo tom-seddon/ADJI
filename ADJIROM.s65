@@ -3401,46 +3401,39 @@ read_joystick_elk:
 ; 
 ; jmp_default_osbyte
 ;
-jmp_default_osbyte: .proc
+
+jmp_default_vector: .macro vec
+                .cerror !((\vec&1)==0&&\vec>=$200&&\vec<=$234),'bad vector'
                 php
 with_p_already_pushed:
                 sei
-                sty os_seia         ;caution
-                ldy #<bytev
-                bne jmp_default_vector_routine
-                .endproc
-                
-jmp_default_keyv: .proc
-                php
-with_p_already_pushed:
-                sei
-                sty os_seia         ;caution
-                ldy #<keyv
-                .cerror *!=jmp_default_vector_routine,'fallthrough broke'
-                .endproc
-jmp_default_vector_routine: .proc
+                sty os_seia
+                ldy #<\vec
                 pha
                 lda default_vectors_ptr+0
                 sta os_seiwk+0
                 lda default_vectors_ptr+1
                 sta os_seiwk+1
-                lda (os_seiwk),y ;routine LSB
+                lda (os_seiwk),y
                 pha
                 iny
-                lda (os_seiwk),y ;routine MSB
+                lda (os_seiwk),y
                 sta os_seiwk+1
                 pla
                 sta os_seiwk+0
                 ldy os_seia
                 pla
-
+                
                 ; If PLP re-enables interrupts, the next instruction
                 ; still always executes, even if there's an interrupt
                 ; pending. (PLP's IRQ check comes before the register
                 ; is updated.) So this use of os_seiwk is quite safe.
                 plp
                 jmp (os_seiwk)
-                .endproc
+                .endm
+                
+jmp_default_osbyte: .jmp_default_vector bytev
+jmp_default_keyv: .jmp_default_vector keyv
 
 ;-------------------------------------------------------------------------
 ;
