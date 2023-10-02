@@ -9,3 +9,4 @@ $.81TEST diff=bbcbasic
 $.LOADER diff=bbcbasic
 $.ADJIBUG diff=bbcbasic
 $.DUMPHAZEL diff=bbcbasic
+$.FSINFO diff=bbcbasic
