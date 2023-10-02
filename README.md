@@ -221,13 +221,13 @@ The value read is a 6-bit quantity, bits as follows. Each used bit is
 set if the corresponding button is pressed, or the joystick is moved
 in that direction.
 
-(You `Raw value` shown in the `*JTEST` output will show the exact
-value read.)
+(`Raw value` shown in the `*JTEST` output will show the exact value
+read.)
 
 | Bit | What |
 | --- | --- |
-| 7   | Unused (ignore) |
-| 6   | Unused (ignore) |
+| 7   | Indeterminate - ignore |
+| 6   | Indeterminate - ignore |
 | 5   | Fire 2 |
 | 4   | Fire 1 |
 | 3   | Right |
@@ -239,9 +239,12 @@ On the Electron, you can read the value directly. `A%=?&FCC0` from
 BASIC, for example, to read the joystick state into `A%`. Or something
 like `lda &FCC0` from assembly language.
 
-On the Master, page &FC needs to be redirected to the cartridge first,
-by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or `lda
-#&20:tsb &FE34`. This may interfere with any devices connected to the
+On the Master but page &FC needs to be redirected to the cartridge
+first, by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or
+`lda #&20:tsb &FE34`. Once you've done this, the joystick can be read
+same as on the Electron.
+
+Changing this setting may interfere with any devices connected to the
 1 MHz bus, so you might want to save the old value of ACCCON and
 restore it afterwards.
 
@@ -252,10 +255,8 @@ squeezed in. Here's where it lives.
 
 ## Master 128
 
-The ROM stores its state in a dummy filing system entry in HAZEL. This
-buys it a few bytes that are fairly unlikely to get overwritten.
-
-It's impossible to select the filing system it pretends to be.
+The ROM stores its state in the Master's filing system workspace (aka
+HAZEL).
 
 To handle persistence across a BREAK, the following areas are also
 used:
