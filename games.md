@@ -48,6 +48,31 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 |Danger UXB |`*JKEYS 1 &B7 &97 &9E &BD &AE &CD &150`
 |Electron Invaders |`*JKEYS 1 &EF &EF &9E &BD &FF &FF &150`|y
 |Frak|Interface position 1||||Interface position 1 then Choose Y when prompted for First Byte joystick
+|Firebug |`*JKEYS 1 &B7 &97 &9E &BD &FF &FF &150`
+|Frenzy |`*JKEYS 1 &B7 &97 &9E &BD &B6 &9D &150`
+|GalaForce |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Hard Hat Harry |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Hobgoblin |`*JKEYS 1 &EF &EF &9E &BD &FF &9D &150`
+|Hobgoblin 2 |`*JKEYS 1 &EF &EF &9E &BD &FF &9D &150`
+|Hopper |`*JKEYS 1 &B7 &97 &9E &BD &EF &EF &150`||||https://github.com/tom-seddon/ADJI/issues/48
+|Jungle Journey |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Killer Gorilla |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Magic Mushrooms |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Meteors |`*JKEYS 1 &FF &FF &9E &BD &B6 &9D &150`
+|Monsters |`*JKEYS 1 &B7 &97 &9E &BD &BC &CD &150`
+|Repton |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Repton 2 |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Repton 3 |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Smash and Grab |`*JKEYS 1 &B7 &97 &9E &BL &B6 &B6 &150`
+|Snapper |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`||`*JJOY 1 &150`
+|Space Alien meets Bugeyes |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
+|Spectapede||| `*JJOY 1 &150`
+|Stock Car |`*JKEYS 1 &EF &EF &9E &BD &FF &FF &150`
+|Swoop |`*JKEYS 1 &B7 &97 &9E &BD &FF &FF &150`
+|Tetris |`*JKEYS 1 &9D &BE &99 &98 &BD &9E &150`
+|The Mine |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150` 
+|Mr.Wiz |`*JKEYS 1 &B7 &97 &9E &BD &9D &9D &150`
+|Percy Penguin |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
 
 ## Requires modification
 
@@ -78,7 +103,8 @@ compatible, might just need modification.
 | Citadel| https://github.com/tom-seddon/ADJI/issues/28|
 | Croaker| https://github.com/tom-seddon/ADJI/issues/29|
 | Cyborg Warriors|https://github.com/tom-seddon/ADJI/issues/34|
-
+| Firetrack|https://github.com/tom-seddon/ADJI/issues/46|
+| Galaforce 2|https://github.com/tom-seddon/ADJI/issues/47|
 
 # Master
 
