@@ -19,6 +19,7 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
+|3D Dotty|`*JKEYS 1 &B7 &97 &9E &BD 7B6 &B6 &150`|
 |Airlift|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|`*JJOY 1 &150`|y||
 | Alien Dropout|`*JKEYS 1 &B7 &97 &9E &BD &A6 &A6 &150`|y|-|-||
 |Ballistix|`*JKEYS 1 &DE &AE &9E &BD &EF &EF &880`|n|-|-||
