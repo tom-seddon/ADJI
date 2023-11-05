@@ -75,14 +75,36 @@ compatible, might just need modification.
 | YieArKungFu | *JKEYS 1 &B7 &97 &9E &BD &B6 &FF X | Y | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
 | YieArKungFu II | *JKEYS 1 &B7 &97 &9E &BD &B6 &FF &0150 | N | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
 | Felix in the Factory | *JKEYS 1 &B7 &97 &9E &BD &B6 &9F &0150 | N | N/A | N/A | No native joystick option, the game itself is not fully compatible with the Master |
-| Nubium | *JKEYS &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
-| Nubium II | *JKEYS &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
+| Nubium | *JKEYS 1 &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
+| Nubium II | *JKEYS 1 &B7 &97 &9E &BD &B6 &9D X | Y | N/A | N/A | No native joystick option |
 | Repton 3 Redux | N/A | N/A | *JJOY 1 X | Y |  |
 | Repton The Lost Realms | N/A | N/A | *JJOY 1 X | Y |  |
-| BubbleBobble | *JKEYS  1 &B7 &97 &DE &DD &9F &FE X | Y | N/A | N/A | No native joystick option |
+| BubbleBobble | *JKEYS 1 &B7 &97 &DE &DD &9F &FE X | Y | N/A | N/A | No native joystick option |
 | ChuckieEgg Professional Edition | N/A | N/A | *JJOY 1 &0880 | N | Has native joystick but needs overlay at &880 |
-| Hobgobblin | *JKEYS  1 &B7 &97 &9E &BD &9D &0880 | N | N/A | N/A | No native joystick option |
+| Hobgobblin | *JKEYS 1 &B7 &97 &9E &BD &9D &0880 | N | N/A | N/A | No native joystick option |
 | Hobgobblin II | *JKEYS  1 &B7 &97 &9E &BD &9D &0880 | N | N/A | N/A | No native joystick option |
+| Swoop | N/A | N/A | *JJOY 1 &150 | N | |
+| Cybertron Mission | N/A | N/A | *JJOY 1 &150 | N | |
+| Overdrive | *JKEYS 1 ? ? ? ? &150 | N | N/A | N/A | Use standard keys for game | 
+| Repton | *JKEYS 1 ? ? ? ? &150 | N | N/A | N/A | Use standard keys for game | 
+| Repton 2 | *JKEYS 1 ? ? ? ? &150 | N | N/A | N/A | Use standard keys for game | 
+| Repton 3 | N/A | N/A | *JJOY 1 X | Y | |
+| Galaforce | N/A | N/A | *JJOY 1 &150 | N | |
+| Vindaloo | *JKEYS 1 ? ? ? ? &380 | N | N/A | N/A | Use standard keys for game | 
+| Imogen | *JKEYS 1 ? ? ? ? &150 | N | N/A | N/A | Use standard keys for game | 
+| Starquake | N/A | N/A | *JJOY 1 &880 | N | Select Joytstick option | 
+| 3D Dotty | N/A | N/A | *JJOY 1 &150 | N | | 
+| Arkanoid | *JKEYS 1 ? ? ? ? &380 | N | N/A | N/A | Use standard keys for game | 
+| E-Type | N/A | N/A | *JJOY 1 X | Y | |
+| Virtigo | N/A | N/A | *JJOY 1 X | Y | |
+| Nevyron | *JKEYS 1 ? ? ? ? ? ? X | Y | N/A | N/A | Use standard keys for game |
+| Morriss Minor | *JKEYS 1 ? ? ? ? ? ? X | Y | N/A | N/A | Use standard keys for game |
+| Manic Mansion | *JKEYS 1 ? ? ? ? ? ? X | Y | N/A | N/A | Use standard keys for game |
+| Python | *JKEYS 1 ? ? ? ? ? ? X | Y | N/A | N/A | Use standard keys for game |
+| Starport | N/A | N/A | *JJOY 1 &380 | N | Select Joytstick option | 
+| Killer Gorilla 2 | N/A | N/A | *JJOY 1 &150 | N | | 
+| Hunchback | N/A | N/A | *JJOY 1 &150 | N | | 
+| Killer Gorilla | N/A | N/A | *JJOY 1 &150 | N | | 
 
 ## Requires modification
 
@@ -91,21 +113,39 @@ compatible, might just need modification.
 
 ## Not compatible
 
-| Game | Reason | Notes |
-| --- | --- | --- | 
+| Game | Reason |
+| --- | --- |
 | Astro Blaster | Accesses hardware directly |
 | Prince of Persia | Uses all the memory |
 | White Light | Accesses hardware directly |
-| Electrobots | TBC |
-| Mr EE | TBC | This game has glitches on master anyway, but JKEYS and JJOY only have partial success |
-| Strykers Run | TBC | Hangs on menu screen |
-| Electrobots Going Underground | TBC | Accesses hardware directly? |
-| Soko-ban | | | 
-| Night Ninja | |  | 
-| Quak NULA Version | |  | 
 
 ## Not working
 
-| Game | Issue |
-| --- | --- |
+| Game | Issue | Notes |
+| --- | --- | --- |
 | Plan B2 | https://github.com/tom-seddon/ADJI/issues/30 |
+| Electrobots | |
+| Mr EE | | This game has glitches on master anyway, but JKEYS and JJOY only have partial success |
+| Strykers Run | | Hangs on menu screen |
+| Electrobots Going Underground | | Accesses hardware directly? |
+| Soko-ban | | | 
+| Night Ninja | | | 
+| Quak NULA Version | | |
+| Nightshade | | |
+| Thrust | | |
+| Kixx | | Responded to fire button but nothinge else |
+| Airwork | | Varying results but never fully |
+| Uridium | | Could not get off title page |
+| Spellbinder | | |
+| OmegaOrb | | |
+| Firetrack | | Though seems to have some hidden hooks for other joysticks, worth looking into, search for 'DEVICE' http://www.level7.org.uk/miscellany/firetrack-disassembly.txt |
+| Pipeline | | |
+| Infinity | | |
+| Xen | | |
+| SpaceInvaders (TrickySoft) | | |
+| Pacman (TrickySoft) | | |
+| Ballot | | |
+| Pitfall | | |
+| New Manic Minor | | |
+| Defender | | |
+| Intertia | | |
