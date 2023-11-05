@@ -30,7 +30,7 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 |Baloon Buster |`*JKEYS 1 &96 &96 &9E &BL &B6 &B6 &150`
 |Blast!|`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &880`|n|-|-||
 |Blitzkrieg|||||set interface address to &FCC0, then say Y when it asks if you have a First Byte interface|
-|Boffins 2 |`*JKEYS 1 &EF &EF &9E &BD &B6 &B6 &150`
+|Boffins 2 |`*JKEYS 1 &EF &EF &9E &BD &B6 &B6 &150`||||https://github.com/tom-seddon/ADJI/issues/25|
 |Boxer |`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &150`
 |Breakthrough |`*JKEYS 1 &EF &EF &9E &BD &B6 &FF &150`
 |Bug Blaster|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|n|-|-||
@@ -39,8 +39,6 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 |Caveman Capers|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|n|-|-||
 |Centibug|`*JKEYS 1 &B7 &97 &9E &BD &A6 &A6 &150`|y|-|-||
 |Chuckie Egg|`*JKEYS 1 &BE &9E &99 &98 &9D &9D &150`|n|-|-||
-|Chuckle Egg |`*JKEYS 1 &BE &9E &99 &98 &9D &9D &150`
-|Commando |`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &150`
 |Commando|`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &150`|y|`*JJOY 1 &150`|y|how do you grenade with joysticks?|
 |Cops n' Robbers|`*JKEYS 1 &B7 &97 &9E &BD &9D &9D &150`|n|-|-||
 |Cosmic Camouflage|`*JKEYS ... &880`|y|-|-|lots of keys! - DIY|
