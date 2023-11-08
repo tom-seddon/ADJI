@@ -636,3 +636,83 @@ b3
    &0185: 8D
    &0186: 01
 #+end_example
+
+
+
+
+* Defaults ideas
+
+(U D L R F1 F2)
+
+Electron combinations:
+
+| Keys                            | Numbers                 |
+|---------------------------------+-------------------------|
+| A Z , . M M                     | &8E &9E &99 &98 &9A &9A |
+| COPY COPY Z &BL DELETE DELETE   | &96 &96 &9E &BD &B6 &B6 |
+| COPY COPY CTRL A DELETE DELETE  | &96 &96 &FE &BE &B6 &B6 |
+| SPACE A , . X Z                 | &9D &BE &99 &98 &BD &9E |
+| DELETE DELETE Z X DELETE DELETE | &B6 &B6 &9E &BD &A6 &A6 |
+| : / Z X SPACE SPACE             | &B7 &97 &9E &BD &9D &9D |
+| : / Z X SPACE SHIFT             | &B7 &97 &9E &BD &9D &FF |
+| : / Z X DELETE DELETE           | &B7 &97 &9E &BD &A6 &A6 |
+| : / Z X S D                     | &B7 &97 &9E &BD &AE &CD |
+| : / Z X DELETE SPACE            | &B7 &97 &9E &BD &B6 &9D |
+| : / Z X DELETE DELETE           | &B7 &97 &9E &BD &B6 &B6 |
+| : / Z X DELETE SHIFT            | &B7 &97 &9E &BD &B6 &FF |
+| : / Z X RETURN D                | &B7 &97 &9E &BD &BC &CD |
+| : / Z X Q Q                     | &B7 &97 &9E &BD &EF &EF |
+| : / Z X SHIFT DELETE            | &B7 &97 &9E &BD &FF &B6 |
+| : / Z X SHIFT SHIFT             | &B7 &97 &9E &BD &FF &FF |
+| : / Z X RETURN DELETE           | &B7 &97 &9E &BD &B6 &B5 |
+| A Z , . SPACE SPACE             | &BE &9E &99 &98 &9D &9D |
+| W S Z X Q Q                     | &DE &AE &9E &BD &EF &EF |
+| Q Q Z X DELETE DELETE           | &EF &EF &9E &BD &B6 &B6 |
+| Q Q Z X DELETE SHIFT            | &EF &EF &9E &BD &B6 &FF |
+| Q Q Z X SHIFT SPACE             | &EF &EF &9E &BD &FF &9D |
+| Q Q Z X SHIFT SHIFT             | &EF &EF &9E &BD &FF &FF |
+| SHIFT SHIFT Z X DELETE SPACE    | &FF &FF &9E &BD &B6 &9D |
+
+If presenting the output in tabular format, max 5 chars per key:
+
+: 0123456789012345678901234567890123456789
+: #  Up    Down  Left  Right Fire1 Fire2
+: xx xxxxx xxxxx xxxxx xxxxx xxxxx xxxxx
+: 00 :     /     Z     X     RET   RET
+: 01 A     Z     ,     .     SPACE SPACE
+
+For most keys, that's ok. Some will need abbreviating. Ideas:
+
+- ~ESCAPE~ :: ~ESC~
+- ~DELETE~ :: ~DEL~
+- ~RETURN~ :: ~RET~
+- ~UP CURSOR~ :: ~UP~
+- ~DOWN CURSOR~ :: ~DOWN~
+- ~LEFT CURSOR~ :: ~LEFT~
+- ~RIGHT CURSOR~ :: ~RIGHT~
+- ~CAPS LOCK~ :: ~CAPS~
+- ~SHIFT LOCK~ :: ~SHFLK~
+- ~NUM RETURN~ :: ~NRET~
+- ~NUM DELETE~ :: ~NDEL~
+
+~Nxxx~ might be better for numeric keys anyway.
+
+ESC, DEL, RET, etc. also aren't too barbaric. 
+
+Maybe just alays use these names anyway? A big advantage is that they
+have no spaces, so I could dodge upgrading the code to use GSINIT/GSREAD.
+
+
+Master combinations:
+
+&B7 &97 &9E &BD &B6 &9D
+&B7 &97 &9E &BD &B6 &9F
+&B7 &97 &9E &BD &B6 &FF
+&B7 &97 &DE &DD &9F &FE
+&EF &BE &C9 &C8 &9D &B6
+
+
+
+
+
+* eof

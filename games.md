@@ -20,14 +20,14 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 | Game |`*JKEYS`|`X`?|`*JJOY`|`X`?|Notes|
 | --- | --- | --- | --- | --- | --- |
 | Alien Dropout|`*JKEYS 1 &B7 &97 &9E &BD &A6 &A6 &150`|y|-|-||
-|3D Dotty|`*JKEYS 1 &B7 &97 &9E &BD 7B6 &B6 &150`|
+|3D Dotty|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|
 |Airlift|`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`|y|`*JJOY 1 &150`|y||
 |Alien Dropout |`*JKEYS 1 &B6 &B6 &9E &BD &A6 &A6 &150`
 |Anarchy Zone |`*JKEYS 1 &B6 &B6 &9E &BD &A6 &A6 &150`
 |Arcadians |`*JKEYS 1 &96 &96 &FE &BE &B6 &B6 &150`
 |Astro Plumber |`*JKEYS 1 &B7 &97 &9E &BD &FF &B6 &150`
 |Ballistix|`*JKEYS 1 &DE &AE &9E &BD &EF &EF &880`|n|-|-||
-|Baloon Buster |`*JKEYS 1 &96 &96 &9E &BL &B6 &B6 &150`
+|Baloon Buster |`*JKEYS 1 &96 &96 &9E &BE &B6 &B6 &150`
 |Blast!|`*JKEYS 1 &B7 &97 &9E &BD &B6 &FF &880`|n|-|-||
 |Blitzkrieg|||||set interface address to &FCC0, then say Y when it asks if you have a First Byte interface|
 |Boffins 2 |`*JKEYS 1 &EF &EF &9E &BD &B6 &B6 &150`||||https://github.com/tom-seddon/ADJI/issues/25|
@@ -43,7 +43,7 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 |Cops n' Robbers|`*JKEYS 1 &B7 &97 &9E &BD &9D &9D &150`|n|-|-||
 |Cosmic Camouflage|`*JKEYS ... &880`|y|-|-|lots of keys! - DIY|
 |Crack-out|`*JKEYS 1 &B7 &97 &9E &BD &9D &FF &150`|n|`*JJOY 1 &150`|n|joystick works poorly. Also claims to support joystick via &FCC0, and that doesn't work well either|
-|Cybertron|`*JKEYS 1 &8E &9E &99 &98 &9A &9A &150`|n|`*JJOY 1 &150`|n||
+|Cybertron|`*JKEYS 1 &BE &9E &99 &98 &9A &9A &150`|n|`*JJOY 1 &150`|n||
 |Cyclon Attack |`*JKEYS 1 &BE &9E &99 &98 &9D &9D &150`|||| Choose 3 to select Joystick from menu and it runs ok
 |Danger UXB |`*JKEYS 1 &B7 &97 &9E &BD &AE &CD &150`
 |Electron Invaders |`*JKEYS 1 &EF &EF &9E &BD &FF &FF &150`|y
@@ -63,7 +63,7 @@ Compatible with one or both of `*JKEYS` and `*JJOY`.
 |Repton |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
 |Repton 2 |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
 |Repton 3 |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
-|Smash and Grab |`*JKEYS 1 &B7 &97 &9E &BL &B6 &B6 &150`
+|Smash and Grab |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
 |Snapper |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`||`*JJOY 1 &150`
 |Space Alien meets Bugeyes |`*JKEYS 1 &B7 &97 &9E &BD &B6 &B6 &150`
 |Spectapede||| `*JJOY 1 &150`
