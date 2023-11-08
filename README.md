@@ -163,10 +163,10 @@ Negative INKEY values are as follows. Keys common to all systems:
 | H | -85 | &AB || Z | -98 | &9E || ESCAPE | -113 | &8F |
 | I | -38 | &DA || 0 | -40 | &D8 || DELETE | -90 | &A6 |
 | J | -70 | &BA || 1 | -49 | &CF || RETURN | -74 | &B6 |
-| K | -71 | &B9 || 2 | -50 | &CE || CURSOR UP | -58 | &C6 |
-| L | -87 | &A9 || 3 | -18 | &EE || CURSOR DOWN | -42 | &D6 |
-| M | -102 | &9A || 4 | -19 | &ED || CURSOR LEFT | -26 | &E6 |
-| N | -86 | &AA || 5 | -20 | &EC || CURSOR RIGHT | -122 | &86 |
+| K | -71 | &B9 || 2 | -50 | &CE || UP CURSOR | -58 | &C6 |
+| L | -87 | &A9 || 3 | -18 | &EE || DOWN CURSOR | -42 | &D6 |
+| M | -102 | &9A || 4 | -19 | &ED || LEFT CURSOR | -26 | &E6 |
+| N | -86 | &AA || 5 | -20 | &EC || RIGHT CURSOR | -122 | &86 |
 | O | -55 | &C9 || 6 | -53 | &CB || COPY | -106 | &96 |
 | P | -56 | &C8 || 7 | -37 | &DB || SHIFT | -1 | &FF |
 | Q | -17 | &EF || 8 | -22 | &EA || CTRL | -2 | &FE |
