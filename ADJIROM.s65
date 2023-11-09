@@ -646,7 +646,7 @@ loop:
 
 copy:
                 lda fs_info_block,x
-                sta ($f2),y
+                sta ($f2),y     ;(not string processing)
 next:
                 iny
                 inx
@@ -3642,31 +3642,29 @@ fc_string_offset: .fill 1
                 .endsection
                 
                 stx fc_table_offset
-                clc
+                sty fc_string_offset
+                ; clc
+L9245:
+                ldy fc_string_offset
                 jsr find_string_tail; Check if command line tail is empty.
                                    ; Entry: ($f2),y = command line tail
                                    ; Exit:  C=0 - something on command line
                                    ;        C=1 - nothing on command line
-                sty fc_string_offset
 
-L9245:
-                ldy fc_string_offset
                 dex
-                dey
 
 L9249:
                 inx
-                iny
                 lda command_table,x
                 sec
                 beq done        ; taken if end of table reached
-                bmi L9269
-                eor ($F2),y
-                and #$5F
-                beq L9249
-                lda ($F2),y
+                bmi L9269       ; taken if end of command reached
+                jsr gsread      ; fetch next command line byte
                 cmp #'.'
-                beq L9271
+                beq abbreviated ; taken if abbreviation encountered
+                and #$df        ; force upper case
+                eor command_table,x
+                beq L9249
 
 L925F:
                 inx
@@ -3680,21 +3678,23 @@ L9265:
                 bne L9245
 
 L9269:
-                lda ($F2),y
+                tya             
+                pha             ; save GSREAD offset
+                jsr gsread
                 jsr isalpha     ; Check if char is alphabetic
                                 ; Entry: A = char of interest
                                 ; Exit:  C=0 if alpha, C=1 if not alpha
+                pla
+                tay             ; restore GSREAD offset
                 bcc L9265       ; taken if alpha
-                dey
 
-L9271:
-                iny
+abbreviated:
                 dex
 
-L9273:
+find_end_loop:
                 inx
                 lda command_table,x
-                bpl L9273
+                bpl find_end_loop
                 clc
 
 done:
@@ -3800,20 +3800,16 @@ L935E:
 ; Exit: C=0 - something on command line, ($f2),y points to it, A=first char
 ;       C=1 - nothing on command line, ($f2),y points to end, A=13
 ; Preserves: X
-retry_find_string_tail:
-                iny
+; 
 find_string_tail:
-                lda ($f2),y     ; read next value from command line
-                cmp #13
-                beq _done       ; taken with C=1 if eol
-                cmp #' '
-                beq retry_find_string_tail ; taken with C=1 if space -
-                                          ; move to next byte and try
-                                          ; again
-                clc
-_done:
+                clc             ;space or CR terminates unquoted string
+                jsr gsinit
+                sec             ;assume eol
+                beq +           ;taken if gsinit said eol
+                clc             ;indicate not eol
++
                 rts
-
+                
 ;-------------------------------------------------------------------------
 ;
 ; Call found command's command table routine.
