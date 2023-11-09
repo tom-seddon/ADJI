@@ -12,7 +12,7 @@ import os,os.path,sys,collections
 ElectronKey=collections.namedtuple('Key','name value_str electron_key')
 Key=collections.namedtuple('Key','name value_str')
 
-key_names={
+intkey_by_name={
     'key_space':0x62,
     'key_comma':0x66,
     'key_minus':0x17,
@@ -220,21 +220,13 @@ num_master_keys=len(keys)
 ##########################################################################
 ##########################################################################
 
-def needs_string_table_entry(x):
-    assert len(x)>0
-    if len(x)==1: return False
-    if x=='\\\\': return False
-    return True
+# def needs_string_table_entry(x):
+#     assert len(x)>0
+#     if len(x)==1: return False
+#     if x=='\\\\': return False
+#     return True
 
 def main(argv):
-    key_offsets=[]
-    next_offset=0
-    for k in keys:
-        if needs_string_table_entry(k.name):
-            key_offsets.append(next_offset)
-            next_offset+=len(k.name)
-        else: key_offsets.append(None)
-
     if len(keys)>128:
         print('FATAL: too many keys',file=sys.stderr)
         sys.exit(1)
@@ -243,52 +235,29 @@ def main(argv):
     print('num_master_keys=%d'%num_master_keys)
     print('num_electron_keys=%d'%num_electron_keys)
 
-    # INKEY value in bits 0-6 (must set bit 7 before use).
-    #
-    # Bit 7 indicates how to interpret the corresponding entry in
-    # key_names_table:
-    #
-    # Clear: 1-char key name
-    #
-    # Set: offset into key_strings_table
+    # INKEY value. in bits 0-6 (must set bit 7 before use).
     print('key_inkey_numbers_table:')
     for i,k in enumerate(keys):
-        value=key_names[k.value_str]
-        assert (value&0x7f)==value,"not 7-bit"
-        # print("    .cerror (%s&$7f)!=%s,'oops'"%(k.value_str,k.value_str))
-        # inkey_str='%s^$7f'%(k.value_str)
+        intkey=intkey_by_name[k.value_str]
+        assert (intkey&0x80)==0
+        inkey=~intkey&0xff
+        print('    .byte $%02x ; %d %s'%(inkey,i,k.value_str))
 
-        topbit=''
-        if key_offsets[i] is not None: topbit='|$80'
-        print('    .byte $%x%s ; %d %s'%(value^0x7f,topbit,i,k.value_str))
-
-    print('key_names_table:')
+    print('key_name_offsets_table:')
+    d=0
     for i,k in enumerate(keys):
-        s='    '
-        if needs_string_table_entry(k.name):
-            s+='.byte %d'%(key_offsets[i])
-        else: s+='.text "%s"'%(k.name)
-        s+=' ; %d'%i
-        print(s)
+        print('    .byte %d ; %d %s'%(d,i,k.name))
+        d+=len(k.name)
 
-    print('key_strings_table:')
-    offset=0
+    print('key_name_strings_table:')
+    d=0
     for i,k in enumerate(keys):
-        if needs_string_table_entry(k.name):
-            print('    .shiftl "%s" ; %d +%d'%(k.name,i,offset))
-            offset+=len(k.name)
+        print('    .shiftl "%s" ; %d +%d'%(k.name,i,d))
+        d+=len(k.name)
 
-    # print('electron_keys_table:')
-    # electron_keys=128*[None]
-    # for i in range(num_electron_keys):
-    #     assert keys[i].value_str in key_names
-    #     internal=key_names[keys[i].value_str]
-    #     assert electron_keys[internal] is None
-    #     electron_keys[internal]=(keys[i].electron_key,keys[i].value_str)
-
-    # for ek in electron_keys:
-    #     if ek is None: print('    .byte $ff')
-    #     else: print('    .byte $%02x ; %s'%(ek[0],ek[1]))
+    if d>256:
+        print('FATAL: key names table too large',file=sys.stderr)
+        sys.exit(1)
         
 ##########################################################################
 ##########################################################################

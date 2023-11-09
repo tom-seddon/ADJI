@@ -1356,10 +1356,6 @@ print_name:
                 txa
                 eor #$7f
 find_key_name:
-                and #$7f
-                cmp key_inkey_numbers_table,y
-                beq char_name_key
-                ora #$80
                 cmp key_inkey_numbers_table,y
                 beq string_name_key
                 iny
@@ -1398,15 +1394,10 @@ print_vector:
                 lda $200,x
                 jmp print_hex_byte
 
-char_name_key:
-                lda key_names_table,y
-                jsr oswrch
-                jmp next
-
 string_name_key:
-                ldx key_names_table,y
+                ldx key_name_offsets_table,y
 -
-                lda key_strings_table,x
+                lda key_name_strings_table,x
                 jsr shiftl_oswrch
                 inx
                 bcc -
@@ -3003,24 +2994,20 @@ waiting_for_no_keys: .fill 1
 main_loop:
                 ror waiting_for_no_keys
 
-                ldx #0
+                ldy #0
 keys_loop:
-                stx kindex
-                lda key_inkey_numbers_table,x
-                pha             ;save INKEY number
-                ora #$80        ;form true INKEY number
-                tax
+                sty kindex
+                ldx key_inkey_numbers_table,y
                 lda #$81
                 ldy #$ff
                 jsr osbyte
-                pla             ;restore INKEY number
                 
                 cpx #$ff        ;C=1 if pressed
                 beq pressed     ;taken if pressed
 
-                ldx kindex
-                inx
-                cpx num_keys
+                ldy kindex
+                iny
+                cpy num_keys
                 bne keys_loop
 
                 ; The end of the table is only reached if no keys
@@ -3043,22 +3030,10 @@ not_escape_pressed:
                 bit waiting_for_no_keys
                 bmi verbose_get_key
 
-                cmp #$80        ;C=1 if name is string table offset
-                ora #$80        ;form true INKEY number
-                tax             ;X=INKEY number
-
-                ldy kindex
-                lda key_names_table,y
-                bcs string_name
-
-                ; Name is 1 char
-                jmp oswrch
-
-string_name:
-                ; Name is multiple chars
-                tay
+                ldx kindex
+                ldy key_name_offsets_table,x
 string_name_loop:
-                lda key_strings_table,y
+                lda key_name_strings_table,y
                 jsr shiftl_oswrch
                 iny
                 bcc string_name_loop
