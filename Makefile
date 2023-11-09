@@ -90,3 +90,11 @@ rel:
 	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM.bin" -o "$(BUILD)"
 	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.bin ADJIROM.*.bin ADJIROM_debug.bin ADJIROM_1fire.bin ADJIROM_1fire_debug.bin "$(SSD_PATH)"
 	$(_V)echo ZIP file: $(ZIP_PATH)
+
+##########################################################################
+##########################################################################
+
+.PHONY:tom_laptop
+tom_laptop:
+	$(_V)$(MAKE) build
+	$(_V)curl --connect-timeout 0.25 --silent -G 'http://localhost:48075/reset/b2' --data-urlencode "config=Master 128 (MOS 3.20)"
