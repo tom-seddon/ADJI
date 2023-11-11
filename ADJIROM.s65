@@ -237,6 +237,7 @@ struct_section: .macro
                 .struct_section reset_default_vectors_workspace
                 .struct_section read_or_write_state_workspace
                 .struct_section find_command_workspace
+                .struct_section find_key_by_name_workspace
                 .struct_section print_joystick_action_name_workspace
                 .endunion
                 
@@ -3601,7 +3602,74 @@ nybble:
                 cld
                 jmp oswrch
                 .endproc
+
+;-------------------------------------------------------------------------
+;
+; Try to find key by name
+;
+; Entry: ($f2),y = pointer to string
+;        X = offset into command table
+; Exit: C=0 if key found
+;       A = key number
+find_key_by_name: .proc
+                .section find_key_by_name_workspace
+kindex: .fill 1
+input_offset: .fill 1
+char: .fill 1                   ; name char
+eon: fill 1                     ; bit 7 set if char is last one in
+                                ; name
+                .endsection
+
+                lda #0
+                sta kindex
+                sty input_offset
+
+names_loop:
+                ldy input_offset
+                jsr find_string_tail
+                bcs done
+
+                ldx kindex
+                lda key_name_offsets_table,x
+                tax
+name_loop:
+                lda key_name_strings_table,x
+                lsr a
+                ror eon
+                sta char
                 
+                jsr gsread
+                bcs eol
+                jsr toupper
+                cmp #'.'
+                beq match
+                cmp char
+                bne no_match
+                inx
+                bit eon
+                bpl name_loop
+
+                ; String matched input. Match if no more input.
+                jsr gsread
+                bcs match
+                
+no_match:
+                inc kindex
+                lda kindex
+                cmp #num_master_keys
+                bne names_loop
+                ; C=1 due to beq
+done:
+                rts
+
+match:
+                ldx kindex
+                lda key_inkey_numbers_table,x
+                clc
+                rts
+                .endproc
+
+
 ;-------------------------------------------------------------------------
 ; 
 ; Try to find command in commands table
