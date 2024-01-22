@@ -97,4 +97,5 @@ rel:
 .PHONY:tom_laptop
 tom_laptop:
 	$(_V)$(MAKE) build
-	$(_V)curl --connect-timeout 0.25 --silent -G 'http://localhost:48075/reset/b2' --data-urlencode "config=Master 128 (MOS 3.20)"
+	$(_V)$(SHELLCMD) blank-line
+	curl --connect-timeout 0.25 --silent -G 'http://localhost:48075/reset/b2' --data-urlencode "config=Master 128 (MOS 3.20)"
