@@ -323,6 +323,7 @@ cmds_offset=*-command_table
                 .command_table_entry "JTEST",cmd_jtest,help_table.jtest_offset
                 .if debug
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
+                .command_table_entry "NTEST",cmd_ntest,help_table.none_offset
                 .endif
                 .if debug
                 .command_table_entry "DBRESET",cmd_dreset,help_table.none_offset
@@ -364,6 +365,9 @@ incompatible_hw_offset: .error_table_entry $ff,'Electron/Master 128 only'
 bad_jno_offset: .error_table_entry $dc,'Bad joystick'
 bad_mode: .error_table_entry $ff,'Bad mode'
 unexpected_os: .error_table_entry $ff,'Unexpected Electron OS'
+                .if debug
+unknown_key: .error_table_entry $ff,'Unknown key'
+                .endif
                 .endblock
                 
 ;-------------------------------------------------------------------------
@@ -1307,6 +1311,29 @@ ktest_loop:
                 jmp osbyte
                 
                 .endproc
+
+;-------------------------------------------------------------------------
+
+                .if debug
+cmd_ntest: .proc
+                jsr find_key_by_name
+                bcs done
+
+                cmp #0
+                bne found
+                
+                ldx #errors_table.unknown_key
+                jmp do_error
+                
+found:
+                jsr print_hex_byte
+                jsr osnewl
+                jmp cmd_ntest
+
+done:
+                rts
+                .endproc
+                .endif
 
 ;-------------------------------------------------------------------------
 
@@ -3609,14 +3636,15 @@ nybble:
 ;
 ; Entry: ($f2),y = pointer to string
 ;        X = offset into command table
-; Exit: C=0 if key found
-;       A = key number
+; Exit: C=1 if string empty
+;       A = key number, or $00 if none found
+;       ($f2),y updated
 find_key_by_name: .proc
                 .section find_key_by_name_workspace
 kindex: .fill 1
 input_offset: .fill 1
-char: .fill 1                   ; name char
-eon: fill 1                     ; bit 7 set if char is last one in
+key_name_char: .fill 1                   ; name char
+eon: .fill 1                     ; bit 7 set if char is last one in
                                 ; name
                 .endsection
 
@@ -3636,20 +3664,22 @@ name_loop:
                 lda key_name_strings_table,x
                 lsr a
                 ror eon
-                sta char
+                sta key_name_char
                 
                 jsr gsread
-                bcs eol
+                bcs no_match
                 jsr toupper
                 cmp #'.'
-                beq match
-                cmp char
+                beq maybe_match
+                cmp key_name_char
                 bne no_match
                 inx
                 bit eon
                 bpl name_loop
 
-                ; String matched input. Match if no more input.
+maybe_match:
+                ; String apparently matched input. Match if no more
+                ; input.
                 jsr gsread
                 bcs match
                 
@@ -3658,7 +3688,10 @@ no_match:
                 lda kindex
                 cmp #num_master_keys
                 bne names_loop
-                ; C=1 due to beq
+                
+                ; No name matched. Return with key 0.
+                lda #0
+                clc
 done:
                 rts
 
