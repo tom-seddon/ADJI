@@ -3724,9 +3724,11 @@ L9269:
                 tya             
                 pha             ; save GSREAD offset
                 jsr gsread
+                bcs +          ; skip if char is invalid
                 jsr isalpha     ; Check if char is alphabetic
                                 ; Entry: A = char of interest
                                 ; Exit:  C=0 if alpha, C=1 if not alpha
++
                 pla
                 tay             ; restore GSREAD offset
                 bcc L9265       ; taken if alpha
