@@ -325,9 +325,9 @@ cmds_offset=*-command_table
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
                 .endif
                 .if debug
-                .command_table_entry "DRESET",cmd_dreset,help_table.none_offset
-                .command_table_entry "DDUMP",cmd_ddump,help_table.none_offset
-                .command_table_entry "DTEST",cmd_dtest,help_table.none_offset
+                .command_table_entry "DBRESET",cmd_dreset,help_table.none_offset
+                .command_table_entry "DBDUMP",cmd_ddump,help_table.none_offset
+                .command_table_entry "DBTEST",cmd_dtest,help_table.none_offset
                 .endif
                 .byte 0
                 .endblock
