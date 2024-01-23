@@ -966,11 +966,27 @@ state_index: .fill 1
 
 loop:
                 ldy yval
+                jsr find_key_by_name
+                bcs try_strtoi  ; taken if string empty - let strtoi
+                                ; generate the error
+                cmp #0
+                bne got_key     ; taken if key recognised - let strtoi
+                                ; try to interpret it as number of not
+                                ; obviously a key namy
+try_strtoi:
+                ldy yval
                 jsr strtoi
-                sty yval
-
+                
+got_key:
                 ; convert to internal key number
                 eor #$ff
+                
+                ; jsr print_hex_byte
+                ; pha
+                ; jsr osnewl
+                ; pla
+                
+                sty yval
 
                 ; bit 7 must be clear! Some of these values are stored
                 ; in the ROM status bytes, and bit 7 implies that bank
@@ -1382,7 +1398,7 @@ print_name:
 
                 ldy #0
                 txa
-                eor #$7f
+                eor #$ff
 find_key_name:
                 cmp key_inkey_numbers_table,y
                 beq string_name_key
@@ -3065,6 +3081,8 @@ string_name_loop:
                 jsr shiftl_oswrch
                 iny
                 bcc string_name_loop
+                lda key_inkey_numbers_table,x
+                tax
                 rts
                 .endproc
 
@@ -3201,7 +3219,6 @@ set_up_state_ptr_master: .proc
                 pla
                 rts
                 .cpu 'default'
-                rts
                 .endproc
 
 ;-------------------------------------------------------------------------

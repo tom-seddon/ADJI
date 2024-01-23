@@ -154,14 +154,14 @@ keys=[
     ElectronKey("ESCAPE",'key_escape',0x34),
     ElectronKey("DELETE",'key_delete',0x07),
     ElectronKey("RETURN",'key_return',0x06),
-    ElectronKey("UP CURSOR",'key_up',0x09),
-    ElectronKey("DOWN CURSOR",'key_down',0x05),
-    ElectronKey("LEFT CURSOR",'key_left',0x04),
-    ElectronKey("RIGHT CURSOR",'key_right',0x00),
+    ElectronKey("UP",'key_up',0x09),
+    ElectronKey("DOWN",'key_down',0x05),
+    ElectronKey("LEFT",'key_left',0x04),
+    ElectronKey("RIGHT",'key_right',0x00),
     ElectronKey("COPY",'key_copy',0x01),
     ElectronKey("SHIFT",'key_shift',0x37),
     ElectronKey("CTRL",'key_ctrl',0x36),
-    ElectronKey("CAPS LOCK",'key_caps_lock',0x35),
+    ElectronKey("CAPS",'key_caps_lock',0x35),
 ]
 num_electron_keys=len(keys)
 
@@ -179,7 +179,7 @@ keys+=[
     Key('^','key_caret'),
     Key('_','key_underline'),
     Key("TAB",'key_tab'),
-    Key("SHIFT LOCK",'key_shift_lock'),
+    Key("SHIFTLOCK",'key_shift_lock'),
     Key("f0",'key_f0'),
     Key("f1",'key_f1'),
     Key("f2",'key_f2'),

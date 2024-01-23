@@ -149,9 +149,14 @@ keys and print a command line you can use again.
 
 The settings will persist across a soft BREAK as per `*JSETUP`.
 
-Negative INKEY values are as follows. Keys common to all systems:
+A key can be specified as its negative INKEY value (either in decimal
+or hex), or its name, as per the following tables. (Key numbers 0-9
+are not valid, so there is no ambiguity when using the number keys.)
+You can abbreviate key names with `.` - e.g., `RET.` is mean `RETURN`.
 
-| Key | Dec | Hex || Key | Dec | Hex || Key | Dec | Hex |
+Keys common to all systems:
+
+| Name | Dec | Hex || Name | Dec | Hex || Name | Hex | Hex |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A | -66 | &BE || S | -82 | &AE || - | -24 | &E8 |
 | B | -101 | &9B || T | -36 | &DC || ; | -88 | &A8 |
@@ -163,38 +168,40 @@ Negative INKEY values are as follows. Keys common to all systems:
 | H | -85 | &AB || Z | -98 | &9E || ESCAPE | -113 | &8F |
 | I | -38 | &DA || 0 | -40 | &D8 || DELETE | -90 | &A6 |
 | J | -70 | &BA || 1 | -49 | &CF || RETURN | -74 | &B6 |
-| K | -71 | &B9 || 2 | -50 | &CE || UP CURSOR | -58 | &C6 |
-| L | -87 | &A9 || 3 | -18 | &EE || DOWN CURSOR | -42 | &D6 |
-| M | -102 | &9A || 4 | -19 | &ED || LEFT CURSOR | -26 | &E6 |
-| N | -86 | &AA || 5 | -20 | &EC || RIGHT CURSOR | -122 | &86 |
+| K | -71 | &B9 || 2 | -50 | &CE || UP | -58 | &C6 |
+| L | -87 | &A9 || 3 | -18 | &EE || DOWN | -42 | &D6 |
+| M | -102 | &9A || 4 | -19 | &ED || LEFT | -26 | &E6 |
+| N | -86 | &AA || 5 | -20 | &EC || RIGHT | -122 | &86 |
 | O | -55 | &C9 || 6 | -53 | &CB || COPY | -106 | &96 |
 | P | -56 | &C8 || 7 | -37 | &DB || SHIFT | -1 | &FF |
 | Q | -17 | &EF || 8 | -22 | &EA || CTRL | -2 | &FE |
-| R | -52 | &CC || 9 | -39 | &D9 || CAPS LOCK | -65 | &BF |
+| R | -52 | &CC || 9 | -39 | &D9 || CAPS | -65 | &BF |
 
 Keys specific to B/Master:
 
-| Key | Dec | Hex || Key | Dec | Hex |
+(The names starting with `N` are for the numeric keypad.)
+
+| Name | Dec | Hex || Name | Dec | Hex |
 | --- | --- | --- | --- | --- | --- | --- |
-| @ | -72 | &B8 || NUM 0 | -107 | &95 |
-| [ | -57 | &C7 || NUM 1 | -108 | &94 |
-| \ | -121 | &87 || NUM 2 | -125 | &83 |
-| ] | -89 | &A7 || NUM 3 | -109 | &93 |
-| ^ | -25 | &E7 || NUM 4 | -123 | &85 |
-| _ | -41 | &D7 || NUM 5 | -124 | &84 |
-| TAB | -97 | &9F || NUM 6 | -27 | &E5 |
-| SHIFT LOCK | -81 | &AF || NUM 7 | -28 | &E4 |
-| f0 | -33 | &DF || NUM 8 | -43 | &D5 |
-| f1 | -114 | &8E || NUM 9 | -44 | &D4 |
-| f2 | -115 | &8D || NUM + | -59 | &C5 |
-| f3 | -116 | &8C || NUM - | -60 | &C4 |
-| f4 | -21 | &EB || NUM / | -75 | &B5 |
-| f5 | -117 | &8B || NUM # | -91 | &A5 |
-| f6 | -118 | &8A || NUM * | -92 | &A4 |
-| f7 | -23 | &E9 || NUM , | -93 | &A3 |
-| f8 | -119 | &89 || NUM RETURN | -61 | &C3 |
-| f9 | -120 | &88 || NUM DELETE | -76 | &B4 |
-||||| NUM . | -77 | &B3 |
+| @ | -72 | &B8 || N0 | -107 | &95 |
+| [ | -57 | &C7 || N1 | -108 | &94 |
+| \ | -121 | &87 || N2 | -125 | &83 |
+| ] | -89 | &A7 || N3 | -109 | &93 |
+| ^ | -25 | &E7 || N4 | -123 | &85 |
+| _ | -41 | &D7 || N5 | -124 | &84 |
+| TAB | -97 | &9F || N6 | -27 | &E5 |
+| SHIFTLOCK | -81 | &AF || N7 | -28 | &E4 |
+| f0 | -33 | &DF || N8 | -43 | &D5 |
+| f1 | -114 | &8E || N9 | -44 | &D4 |
+| f2 | -115 | &8D || N+ | -59 | &C5 |
+| f3 | -116 | &8C || N- | -60 | &C4 |
+| f4 | -21 | &EB || N/ | -75 | &B5 |
+| f5 | -117 | &8B || N# | -91 | &A5 |
+| f6 | -118 | &8A || N* | -92 | &A4 |
+| f7 | -23 | &E9 || N, | -93 | &A3 |
+| f8 | -119 | &89 || NRETURN | -61 | &C3 |
+| f9 | -120 | &88 || NDELETE | -76 | &B4 |
+||||| N. | -77 | &B3 |
 
 # Limitations/bugs
 
