@@ -342,7 +342,6 @@ Crashes - looks like it scribbles over page $d!
 Works OK with overlay at &150
 
 
-
 * BASIC Editor OSBYTE vs overlay issue
 
 ** qnd investigation
@@ -639,7 +638,6 @@ b3
 
 
 
-
 * Defaults ideas
 
 (U D L R F1 F2)
@@ -714,5 +712,32 @@ Master combinations:
 
 
 
+* Release process
+
+Do this from =main=. =git push= so that the working copy matches the
+head version on GitHub.
+
+Run =make= to build release. (Specify =DIRTY_OK\=1= if testing with a
+dirty working copy. Don't use these builds for a release though!)
+
+#+begin_src shell
+  make rel
+  make rel DIRTY_OK=1
+#+end_src
+
+Visit https://github.com/tom-seddon/ADJI/releases and click =Draft a
+new release=.
+
+Paste release from =make rel= output into the tag field and use as the
+release title.
+
+Describe release appropriately. Mention the ROM version number.
+
+Attach the ZIP file to the release.
+
+Publish.
+
+Bump the version number in =ADJIROM.s65= ready for the next release,
+and commit that.
 
 * eof
