@@ -13,6 +13,21 @@ Requires Electron or Master 128.
 Connect the joystick interface to one of the cartridge slots, and plug
 a 9-pin joystick into the 9-pin plug.
 
+Use the DIP switches on the cartridge to select the joystick number,
+relating to the address the joystick will use. You can pick any,
+they're all the same, provided it won't conflict with some other piece
+of hardware attached to the computer.
+
+The DIP switch settings and corresponding number and address (and
+known problems) are as follows:
+
+| Switches | Number | Address | Notes                               |
+|----------|--------|---------|-------------------------------------|
+| D D      | 1      | &FCC0   | Not compatible with Electron+Plus 3 |
+| U D      | 2      | &FCD0   |                                     |
+| D U      | 3      | &FCE0   |                                     |
+| U U      | 4      | &FCF0   |                                     |
+
 The ROM can run from any bank, including sideways RAM.
 
 ## Slogger interface compatibility
@@ -31,14 +46,7 @@ will suggest `0`.
 
 To test it out, use `*JTEST`. This takes one parameter: the joystick
 number, 1-4, corresponding to the DIP switch settings on the cartridge
-(D = Down, U = Up).
-
-| Number | Switches |
-|--------|----------|
-| 1      | D D      |
-| 2      | U D      |
-| 3      | D U      |
-| 4      | U U      |
+(see above).
 
 The joystick test screen reads the joystick, and shows on screen which
 directions and/or buttons are being pressed.
@@ -116,7 +124,10 @@ was working fine in game.
 `*HELP ADJI` will print `(active)` or `(inactive)` to indicate the
 ADJI joystick status.
 
-## `*JOFF` - switch digital joystick support off
+## `*JOFF` - switch joystick support off
+
+Cancels any `*JSETUP`/`*JJOY`/`*JKEYS` settings and makes the ADJI
+inactive again.
 
 No parameters required.
 
@@ -178,7 +189,7 @@ Keys common to all systems:
 | Q    | -17  | &EF |   | 8    | -22  | &EA |   | CTRL   | -2   | &FE |
 | R    | -52  | &CC |   | 9    | -39  | &D9 |   | CAPS   | -65  | &BF |
 
-Keys specific to B/Master:
+Keys specific to Master:
 
 (The names starting with `N` are for the numeric keypad.)
 
@@ -209,21 +220,12 @@ Keys specific to B/Master:
 - Joystick keys don't affect OSRDCH, so you can't use them to press
   keys at the BASIC prompt, or when using `INPUT`, etc.
   
-- `*JJOY` effectively disables both analogue joysticks, even though it
-  could pass through to one of them and it wouldn't interfere
+- `*JJOY` effectively disables both analogue joysticks
 
 # Using the ADJI from code
 
 The joystick appears as a single byte in page &FC, location depending
-on the DIP switch settings. The relationship between joystick number
-(as per `*JSETUP`, etc.), DIP switches and address is as follows:
-
-| Number | Address | Switches |
-|--------|---------|----------|
-| 1      | &FCC0   | D D      |
-| 2      | &FCD0   | U D      |
-| 3      | &FCE0   | D U      |
-| 4      | &FCF0   | U U      |
+on the DIP switch settings, as per the table above.
 
 The value read is a 6-bit quantity, bits as follows. Each used bit is
 set if the corresponding button is pressed, or the joystick is moved
