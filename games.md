@@ -146,6 +146,7 @@ compatible, might just need modification.
 | Killer Gorilla 2 | N/A | N/A | *JJOY 1 &150 | N | | 
 | Hunchback | N/A | N/A | *JJOY 1 &150 | N | | 
 | Killer Gorilla | N/A | N/A | *JJOY 1 &150 | N | | 
+| Prince of Persia | ? | ? | ? | ? | Does work, but don't have a record of the command line - see https://github.com/tom-seddon/ADJI/issues/45 |
 
 ## Requires modification
 
@@ -157,7 +158,6 @@ compatible, might just need modification.
 | Game | Reason |
 | --- | --- |
 | Astro Blaster | Accesses hardware directly |
-| Prince of Persia | Uses all the memory |
 | White Light | Accesses hardware directly |
 
 ## Not working
