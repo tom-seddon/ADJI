@@ -34,11 +34,11 @@ number, 1-4, corresponding to the DIP switch settings on the cartridge
 (D = Down, U = Up).
 
 | Number | Switches |
-| --- | --- |
-| 1 | D D |
-| 2 | U D |
-| 3 | D U |
-| 4 | U U |
+|--------|----------|
+| 1      | D D      |
+| 2      | U D      |
+| 3      | D U      |
+| 4      | U U      |
 
 The joystick test screen reads the joystick, and shows on screen which
 directions and/or buttons are being pressed.
@@ -157,52 +157,52 @@ commands - e.g., `RET.` is shorthand for `RETURN`.
 
 Keys common to all systems:
 
-| Name | Dec | Hex || Name | Dec | Hex || Name | Hex | Hex |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | -66 | &BE || S | -82 | &AE || - | -24 | &E8 |
-| B | -101 | &9B || T | -36 | &DC || ; | -88 | &A8 |
-| C | -83 | &AD || U | -54 | &CA || : | -73 | &B7 |
-| D | -51 | &CD || V | -100 | &9C || , | -103 | &99 |
-| E | -35 | &DD || W | -34 | &DE || . | -104 | &98 |
-| F | -68 | &BC || X | -67 | &BD || / | -105 | &97 |
-| G | -84 | &AC || Y | -69 | &BB || SPACE | -99 | &9D |
-| H | -85 | &AB || Z | -98 | &9E || ESCAPE | -113 | &8F |
-| I | -38 | &DA || 0 | -40 | &D8 || DELETE | -90 | &A6 |
-| J | -70 | &BA || 1 | -49 | &CF || RETURN | -74 | &B6 |
-| K | -71 | &B9 || 2 | -50 | &CE || UP | -58 | &C6 |
-| L | -87 | &A9 || 3 | -18 | &EE || DOWN | -42 | &D6 |
-| M | -102 | &9A || 4 | -19 | &ED || LEFT | -26 | &E6 |
-| N | -86 | &AA || 5 | -20 | &EC || RIGHT | -122 | &86 |
-| O | -55 | &C9 || 6 | -53 | &CB || COPY | -106 | &96 |
-| P | -56 | &C8 || 7 | -37 | &DB || SHIFT | -1 | &FF |
-| Q | -17 | &EF || 8 | -22 | &EA || CTRL | -2 | &FE |
-| R | -52 | &CC || 9 | -39 | &D9 || CAPS | -65 | &BF |
+| Name | Dec  | Hex |   | Name | Dec  | Hex |   | Name   | Hex  | Hex |
+|------|------|-----|---|------|------|-----|---|--------|------|-----|
+| A    | -66  | &BE |   | S    | -82  | &AE |   | -      | -24  | &E8 |
+| B    | -101 | &9B |   | T    | -36  | &DC |   | ;      | -88  | &A8 |
+| C    | -83  | &AD |   | U    | -54  | &CA |   | :      | -73  | &B7 |
+| D    | -51  | &CD |   | V    | -100 | &9C |   | ,      | -103 | &99 |
+| E    | -35  | &DD |   | W    | -34  | &DE |   | .      | -104 | &98 |
+| F    | -68  | &BC |   | X    | -67  | &BD |   | /      | -105 | &97 |
+| G    | -84  | &AC |   | Y    | -69  | &BB |   | SPACE  | -99  | &9D |
+| H    | -85  | &AB |   | Z    | -98  | &9E |   | ESCAPE | -113 | &8F |
+| I    | -38  | &DA |   | 0    | -40  | &D8 |   | DELETE | -90  | &A6 |
+| J    | -70  | &BA |   | 1    | -49  | &CF |   | RETURN | -74  | &B6 |
+| K    | -71  | &B9 |   | 2    | -50  | &CE |   | UP     | -58  | &C6 |
+| L    | -87  | &A9 |   | 3    | -18  | &EE |   | DOWN   | -42  | &D6 |
+| M    | -102 | &9A |   | 4    | -19  | &ED |   | LEFT   | -26  | &E6 |
+| N    | -86  | &AA |   | 5    | -20  | &EC |   | RIGHT  | -122 | &86 |
+| O    | -55  | &C9 |   | 6    | -53  | &CB |   | COPY   | -106 | &96 |
+| P    | -56  | &C8 |   | 7    | -37  | &DB |   | SHIFT  | -1   | &FF |
+| Q    | -17  | &EF |   | 8    | -22  | &EA |   | CTRL   | -2   | &FE |
+| R    | -52  | &CC |   | 9    | -39  | &D9 |   | CAPS   | -65  | &BF |
 
 Keys specific to B/Master:
 
 (The names starting with `N` are for the numeric keypad.)
 
-| Name | Dec | Hex || Name | Dec | Hex |
-| --- | --- | --- | --- | --- | --- | --- |
-| @ | -72 | &B8 || N0 | -107 | &95 |
-| [ | -57 | &C7 || N1 | -108 | &94 |
-| \ | -121 | &87 || N2 | -125 | &83 |
-| ] | -89 | &A7 || N3 | -109 | &93 |
-| ^ | -25 | &E7 || N4 | -123 | &85 |
-| _ | -41 | &D7 || N5 | -124 | &84 |
-| TAB | -97 | &9F || N6 | -27 | &E5 |
-| SHIFTLOCK | -81 | &AF || N7 | -28 | &E4 |
-| f0 | -33 | &DF || N8 | -43 | &D5 |
-| f1 | -114 | &8E || N9 | -44 | &D4 |
-| f2 | -115 | &8D || N+ | -59 | &C5 |
-| f3 | -116 | &8C || N- | -60 | &C4 |
-| f4 | -21 | &EB || N/ | -75 | &B5 |
-| f5 | -117 | &8B || N# | -91 | &A5 |
-| f6 | -118 | &8A || N* | -92 | &A4 |
-| f7 | -23 | &E9 || N, | -93 | &A3 |
-| f8 | -119 | &89 || NRETURN | -61 | &C3 |
-| f9 | -120 | &88 || NDELETE | -76 | &B4 |
-||||| N. | -77 | &B3 |
+| Name      | Dec  | Hex |   | Name    | Dec  | Hex |
+|-----------|------|-----|---|---------|------|-----|
+| @         | -72  | &B8 |   | N0      | -107 | &95 |
+| [         | -57  | &C7 |   | N1      | -108 | &94 |
+| \         | -121 | &87 |   | N2      | -125 | &83 |
+| ]         | -89  | &A7 |   | N3      | -109 | &93 |
+| ^         | -25  | &E7 |   | N4      | -123 | &85 |
+| _         | -41  | &D7 |   | N5      | -124 | &84 |
+| TAB       | -97  | &9F |   | N6      | -27  | &E5 |
+| SHIFTLOCK | -81  | &AF |   | N7      | -28  | &E4 |
+| f0        | -33  | &DF |   | N8      | -43  | &D5 |
+| f1        | -114 | &8E |   | N9      | -44  | &D4 |
+| f2        | -115 | &8D |   | N+      | -59  | &C5 |
+| f3        | -116 | &8C |   | N-      | -60  | &C4 |
+| f4        | -21  | &EB |   | N/      | -75  | &B5 |
+| f5        | -117 | &8B |   | N#      | -91  | &A5 |
+| f6        | -118 | &8A |   | N*      | -92  | &A4 |
+| f7        | -23  | &E9 |   | N,      | -93  | &A3 |
+| f8        | -119 | &89 |   | NRETURN | -61  | &C3 |
+| f9        | -120 | &88 |   | NDELETE | -76  | &B4 |
+|           |      |     |   | N.      | -77  | &B3 |
 
 # Limitations/bugs
 
@@ -219,11 +219,11 @@ on the DIP switch settings. The relationship between joystick number
 (as per `*JSETUP`, etc.), DIP switches and address is as follows:
 
 | Number | Address | Switches |
-| --- | --- | --- |
-| 1 | &FCC0 | D D |
-| 2 | &FCD0 | U D |
-| 3 | &FCE0 | D U |
-| 4 | &FCF0 | U U |
+|--------|---------|----------|
+| 1      | &FCC0   | D D      |
+| 2      | &FCD0   | U D      |
+| 3      | &FCE0   | D U      |
+| 4      | &FCF0   | U U      |
 
 The value read is a 6-bit quantity, bits as follows. Each used bit is
 set if the corresponding button is pressed, or the joystick is moved
@@ -232,16 +232,16 @@ in that direction.
 (`Raw value` shown in the `*JTEST` output will show the exact value
 read.)
 
-| Bit | What |
-| --- | --- |
+| Bit | What                   |
+|-----|------------------------|
 | 7   | Indeterminate - ignore |
 | 6   | Indeterminate - ignore |
-| 5   | Fire 2 |
-| 4   | Fire 1 |
-| 3   | Right |
-| 2   | Left |
-| 1   | Down |
-| 0   | Up |
+| 5   | Fire 2                 |
+| 4   | Fire 1                 |
+| 3   | Right                  |
+| 2   | Left                   |
+| 1   | Down                   |
+| 0   | Up                     |
 
 On the Electron, you can read the value directly. `A%=?&FCC0` from
 BASIC, for example, to read the joystick state into `A%`. Or something
