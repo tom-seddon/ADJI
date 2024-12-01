@@ -152,7 +152,8 @@ The settings will persist across a soft BREAK as per `*JSETUP`.
 A key can be specified as its negative INKEY value (either in decimal
 or hex), or its name, as per the following tables. (Key numbers 0-9
 are not valid, so there is no ambiguity when using the number keys.)
-You can abbreviate key names with `.` - e.g., `RET.` is mean `RETURN`.
+You can abbreviate key names with `.`, some as BASIC keywords and star
+commands - e.g., `RET.` is shorthand for `RETURN`.
 
 Keys common to all systems:
 
