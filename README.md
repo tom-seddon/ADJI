@@ -265,13 +265,8 @@ squeezed in. Here's where it lives.
 
 ## Master 128
 
-The ROM stores its state in the Master's filing system workspace (aka
-HAZEL).
-
-To handle persistence across a BREAK, the following areas are also
-used:
-
-- &287-&289 (BREAK intercept routine) - xvector/overlay settings info
+The ROM stores all of its state in the Master's filing system
+workspace (aka HAZEL). 2 filing system info blocks are used.
 
 ## Electron
 

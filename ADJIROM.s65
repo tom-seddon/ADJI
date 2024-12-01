@@ -656,21 +656,16 @@ store_fs_info: .proc
 reset:
                 ldx #0
 loop:
-                bvc copy
-                
-                ; Don't overwrite the 7 state bytes.
-                cpx #fs_info_block.spare_begin
-                bcc copy
-                cpx #fs_info_block.spare_end
-                bcc next
-
-copy:
                 lda fs_info_block,x
+                bvc store       ; taken if hard reset
+                cmp #' '
+                beq next        ; taken if one of the state bytes
+store:
                 sta ($f2),y     ;(not string processing)
 next:
                 iny
                 inx
-                cpx #11
+                cpx #size(fs_info_block)
                 bne loop
                 jmp unclaimed
                 .cpu 'default'
@@ -765,7 +760,8 @@ boot: .proc
                 bcc check_boot_type
 
                 ; $49 is the value the entry ends up in on my Master
-                ; by default. As good a place as any.
+                ; by default. As good a place as any. It's in OS 1.20
+                ; mode so other ROMs won't be poking at it.
                 lda #$49
                 sta $df0,x
 
@@ -776,7 +772,8 @@ check_boot_type:
                 ; The policy is that power up or hard break cancels
                 ; the JJOY or JKEYS state state.
                 lda #0
-                sta os_break_intercept+0
+                ldx #0
+                jsr store_persistent_state_metadata
 boot_done:
                 pla
                 tay
@@ -819,7 +816,8 @@ loop:
                 cpy #State.action_keys+num_actions
                 bne loop
 
-                lda os_break_intercept+0
+                ldx #0
+                jsr load_persistent_state_metadata
                 cmp #'X'
                 beq xvector
 
@@ -827,12 +825,14 @@ overlay:
                 cmp #'O'
                 bne @b boot_done
 
-                lda os_break_intercept+2
+                ldx #2
+                jsr load_persistent_state_metadata
                 sta strtoi_value+1
                 .if debug
                 jsr print_hex_byte
                 .endif
-                lda os_break_intercept+1
+                ldx #1
+                jsr load_persistent_state_metadata
                 sta strtoi_value+0
                 .if debug
                 jsr print_hex_byte
@@ -841,10 +841,12 @@ overlay:
                 jmp boot_done
 
 xvector:
-                lda os_break_intercept+1
+                ldx #1
+                jsr load_persistent_state_metadata
                 cmp #'X'
                 bne @b boot_done
-                lda os_break_intercept+2
+                ldx #2
+                jsr load_persistent_state_metadata
                 cmp #'X'
                 bne @b boot_done
                 jsr install_xvector
@@ -854,12 +856,18 @@ xvector:
                 .endproc
 
 fs_info_block: .block
+                ; entry 0
                 .text '*'       ;extremely bogus...
-spare_begin=*-fs_info_block
                 .fill 7,' '
-spare_end=*-fs_info_block
                 .text 1,2,1     ;CFS values
+
+                ; entry 1
+                .text '*'
+persistent_metadata_offset=*-fs_info_block
+                .fill 7,' '
+                .text 1,2,1     ; CFS values
                 .endblock
+                .cerror size(fs_info_block)%11!=0
                 
 ;-------------------------------------------------------------------------
 
@@ -1565,12 +1573,14 @@ master_loop:
 
 note_overlay_address:
                 lda #'O'
-                sta os_break_intercept+0
+                ldx #0
+                jsr store_persistent_state_metadata
                 lda strtoi_value+0
-                sta os_break_intercept+1
+                ldx #1
+                jsr store_persistent_state_metadata
                 lda strtoi_value+1
-                sta os_break_intercept+2
-
+                ldx #2
+                jsr store_persistent_state_metadata
                 rts
                 
 maybe_set_overlay_keyv:
@@ -1654,9 +1664,12 @@ xvectors: .fill 2
 keyv_done:
 
                 lda #'X'
-                sta os_break_intercept+0
-                sta os_break_intercept+1
-                sta os_break_intercept+2
+                ldx #0
+                jsr store_persistent_state_metadata
+                ldx #1
+                jsr store_persistent_state_metadata
+                ldx #2
+                jsr store_persistent_state_metadata
                 
                 plp
                 rts
@@ -1670,6 +1683,98 @@ keyv_values:
                 .word handle_keyv_xvector_electron
                 
                 .endproc
+
+;-------------------------------------------------------------------------
+;
+; Store persistent state metadata.
+;
+; There are 3 bytes of persistent state metadata.
+;
+; Entry: X=index (0-2)
+;        A=value to write
+; Preserves: A/X/Y
+store_persistent_state_metadata: .proc
+                jsr is_valid_hw
+                bcc done
+                bvc electron
+master:
+                .cpu '65c02'
+                php             ; save old P
+                sei
+                phx             ; save old X
+                phy             ; save old Y
+                ldy acccon
+                phy             ; save old ACCCON
+                pha             ; save value to write
+                lda #acccon.y
+                tsb acccon      ; page in HAZEL
+                txa             ; A=index
+                clc
+                adc #fs_info_block.persistent_metadata_offset ; no carry here
+                ldx $f4
+                adc $df0,x      ; add HAZEL offset
+                tax
+                pla             ; restore value to write
+                sta $df00,x
+                plx             ; restore old ACCCON
+                stx acccon
+                ply             ; restore old Y
+                plx             ; restore old X
+                plp             ; restore old P
+                .cpu 'default'
+done:
+                rts
+
+electron:
+                sta os_break_intercept,x
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; Read persistent state metadata.
+;
+; Entry: X=index (0-2)
+; Exit: A=value read
+; Preserves: X/Y
+load_persistent_state_metadata: .proc
+                jsr is_valid_hw
+                bcc invalid
+                bvc electron
+
+master:
+                .cpu '65c02'
+                php             ; save old P
+                sei
+                phx             ; save old X
+                lda acccon
+                pha             ; save old ACCCON
+                lda #acccon.y
+                tsb acccon      ; page in HAZEL
+                txa             ; A=index
+                clc
+                adc #fs_info_block.persistent_metadata_offset ; no carry here
+                ldx $f4
+                adc $df0,x      ; add HAZEL offset
+                tax
+                lda $df00,x     ; read metadata value
+                plx
+                stx acccon
+                plx             ; restore old X
+                plp             ; restore old P
+                .cpu 'default'
+                rts
+                
+electron:
+                lda os_break_intercept,x
+                rts
+
+invalid:
+                lda #0
+                rts
+                
+                .endproc
+                
 ;-------------------------------------------------------------------------
                 .endsection common
 ;-------------------------------------------------------------------------
@@ -3325,7 +3430,8 @@ rdv_ptr: .fill 2
                 jsr restore_default_vector
 
                 lda #0
-                sta os_break_intercept+0
+                ldx #0
+                jsr store_persistent_state_metadata
 
                 ldy #State.jflags
                 jsr read_state
