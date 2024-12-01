@@ -565,7 +565,22 @@ joystick_fred_offsets_by_jflags:
                 .for i=0,i<256,i+=1
                 .byte fred_offsets[i&State.jflags.jindex_mask]
                 .endfor
-                
+;-------------------------------------------------------------------------
+                .align 256
+state_offset_for_joystick_value:
+                ; .cerror jall_mask!=63,"code needs minor rethink"
+                .for _i=0,_i<256,_i+=1
+                .if (_i&jall_mask)==0
+                .byte $ff
+                .else
+                .for _j=0,_j<6,_j+=1
+                .if (_i&(1<<_j))!=0
+                .byte _j
+                .break
+                .endif
+                .endfor
+                .endif
+                .endfor
 ;-------------------------------------------------------------------------
                 .endsection big_tables
 ;-------------------------------------------------------------------------
@@ -1866,19 +1881,16 @@ timeout:
                 sty elk_osbyte_81_timeout+1
 loop:
                 ; Read joystick
-                ldy elk_jflags
-                ldx joystick_fred_offsets_by_jflags,y
-                lda $fc00,x
-                and #jall_mask
-                beq try_osbyte  ;taken if obviously nothing pressed
+                ldx elk_jflags
+                ldy joystick_fred_offsets_by_jflags,x
+                ldx $fc00,y
 
-                ; Find state offset for action.
-                ldy #State.action_keys-1
-find_index_loop:
-                iny
-                lsr a
-                bcc find_index_loop
-
+                ; TODO should merge state_offset_for_joystick_value
+                ; and elk_state_offsets into 1 table. ($00 will never
+                ; be a valid offset into page 2.) But both tables are
+                ; in ROM so it's not a massive problem.
+                ldy state_offset_for_joystick_value,x
+                bmi try_osbyte
                 ldx elk_state_offsets,y
                 ldy $200,x
                 bpl jkey_pressed
@@ -2422,22 +2434,11 @@ loop:
                 lda #acccon.ifj|acccon.y
                 tsb acccon
                 lda (os_seiwk)
-                tay
-                ldx joystick_fred_offsets_by_jflags,y
-                lda $fc00,x
-                and #jall_mask
-                beq try_osbyte  ;taken if obviously nothing pressed
-
-                ; Find state offset for action.
-                ;
-                ; TODO: there'll probably be room to have this in a
-                ; table.
-                ldy #State.action_keys-1
-find_index_loop:
-                iny
-                lsr a
-                bcc find_index_loop
-
+                tax
+                ldy joystick_fred_offsets_by_jflags,x
+                ldx $fc00,y
+                ldy state_offset_for_joystick_value,x
+                bmi try_osbyte
                 lda (os_seiwk),y
                 bpl jkey_pressed
                 
