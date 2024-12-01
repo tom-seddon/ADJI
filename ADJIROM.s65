@@ -291,7 +291,7 @@ rom_copyright:
                 .byte 0
                 .text '('
 sev_value:                      ;value with bit 6 set
-                .text 'C) 2023 Retro Hardware'
+                .text 'C) 2024 Retro Hardware'
 rom_copyright_end:
                 .byte 0
 ;-------------------------------------------------------------------------
