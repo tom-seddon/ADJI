@@ -401,16 +401,14 @@ names:
 
 ;-------------------------------------------------------------------------
 
+elk_state_addresses_list=[elk_jflags,elk_up,elk_down,elk_left,elk_right,elk_fire1]..(single_fire_button?[]:[elk_fire2])
+
+                .for _i=1,_i<len(elk_state_addresses_list),_i+=1
+                .cerror (>elk_state_addresses_list[_i])!=(>elk_state_addresses_list[0])
+                .endfor
+                
 elk_state_offsets: .proc
-                .byte <elk_jflags
-                .byte <elk_up
-                .byte <elk_down
-                .byte <elk_left
-                .byte <elk_right
-                .byte <elk_fire1
-                .if !single_fire_button
-                .byte <elk_fire2
-                .endif
+                .byte <elk_state_addresses_list
                 .endproc
                 
 ;-------------------------------------------------------------------------
@@ -1948,16 +1946,23 @@ osbyte_81_electron: .proc
                 beq jmp_default_osbyte.with_p_already_pushed
 
                 ; Is this one of the jkeys?
+                ldy elk_jflags
+                ldx joystick_fred_offsets_by_jflags,y
+                ldy $fc00,x     ; Y = joystick reading
+
                 lda os_x
                 eor #$ff        ;convert to internal key
+                tax             ; X = internal key
 
-                ldx #num_actions-1 ;X=action index
-poll_key_loop:
-                ldy elk_state_offsets+State.action_keys,x
-                cmp $200,y
-                beq found_key
-                dex
-                bpl poll_key_loop
+                .for key_index=0,((1<<key_index)&jall_mask)!=0,key_index+=1
+                cpx elk_state_addresses_list[State.action_keys+key_index]
+                bne +
+
+                tya             ; A = joystick reading
+                and #1<<key_index
+                bne found_key
++
+                .endfor
 not_found_key:
                 lda #$81
                 ldy #$ff
@@ -1965,13 +1970,6 @@ not_found_key:
                 jmp jmp_default_osbyte.with_p_already_pushed
 
 found_key:
-                ldy elk_jflags
-                lda joystick_fred_offsets_by_jflags,y
-                tay
-                lda $fc00,y
-                and joystick_actions.masks,x
-                beq not_found_key
-
                 ldx #$ff
                 ldy #$ff
                 lda #$81
@@ -2484,23 +2482,23 @@ osbyte_81_master: .proc
                 eor #$ff        ;convert to internal key
                 sta os_x
 
-poll_key_loop:
-                lda os_x
-                cmp (os_seiwk),y
-                bne poll_next_key
-
                 lda (os_seiwk)
                 tax
-                lda joystick_fred_offsets_by_jflags,x
-                tax
-                lda $fc00,x
-                and joystick_actions.masks-State.action_keys,y
+                ldy joystick_fred_offsets_by_jflags,x
+                ldx $fc00,y     ; X=joystick reading
+
+                .for key_index=0,((1<<key_index)&jall_mask)!=0,key_index+=1
+                ldy #State.action_keys+key_index
+                lda os_x
+                cmp (os_seiwk),y
+                bne +
+
+                txa
+                and #1<<key_index
                 bne found_key
-                
-poll_next_key:
-                iny
-                cpy #State.action_keys+num_actions
-                bne poll_key_loop
++
+                .endfor
+
 not_found_key:
                 pla
                 sta acccon
