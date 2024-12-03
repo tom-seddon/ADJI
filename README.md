@@ -141,6 +141,24 @@ No parameters required.
 
 The settings will persist across a soft BREAK as per `*JSETUP`.
 
+## `*JPRESET` - use the digital joystick as keys
+
+Run `*JPRESET` with no parameters to see the list of presets
+available, numbered from 0 upwards. Each one lists the keys for that
+preset: up, down, left, right, fire button 1, and fire button 2 (not
+shown if using the `1F` ROM).
+
+To select a preset, supply 3 parameters to `*JPRESET`:
+
+1. Joystick number, 1-4, as above
+2. Preset number, 0 upwards, as above
+3. Overlay address or `X`, as above
+
+Like `*JSETUP`, the settings will persist across a soft BREAK.
+
+(Note that if using the `1F` ROM, some presets are identical, as they
+differ only in the key assigned to the 2nd fire button.)
+
 ## `*JKEYS` - use the digital joystick as keys
 
 `*JKEYS` takes 7 parameters, with all keys specified as negative INKEY
@@ -158,7 +176,8 @@ values:
 Easiest thing to do is use `*JSETUP`, which will prompt you for the
 keys and print a command line you can use again.
 
-The settings will persist across a soft BREAK as per `*JSETUP`.
+The settings will persist across a soft BREAK as per `*JSETUP` and
+`*JPRESET`.
 
 A key can be specified as its negative INKEY value (either in decimal
 or hex), or its name, as per the following tables. (Key numbers 0-9
@@ -191,7 +210,7 @@ Keys common to all systems:
 
 There's also an additional special key, corresponding to no key on the
 keyboard. Use this if you don't want a given joystick action to
-correspond to a key. The 
+correspond to a key.
 
 | Name | Dec  | Hex |
 |------|------|-----|

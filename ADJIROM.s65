@@ -215,6 +215,7 @@ struct_section: .macro
                 ; Leaf routines that return a result in zero page
                 .union
                 .struct_section strtoi_workspace
+                .struct_section find_preset_by_index_workspace
                 .endunion
 
                 ; * commands
@@ -225,6 +226,7 @@ struct_section: .macro
                 .struct_section cmd_jsetup_workspace
                 .struct_section cmd_jstate_workspace
                 .struct_section cmd_ddump_workspace
+                .struct_section cmd_jpreset_workspace
                 .endunion
                 
                 .cerror *>$b0,'zp overflow'
@@ -264,6 +266,7 @@ struct_section: .macro
                 .dsection electron_only
                 .dsection library
                 .dsection big_tables
+                .dsection presets
                 
                 .if debug
                 .dsection debug
@@ -326,6 +329,7 @@ cmds_offset=*-command_table
                 .command_table_entry "JSTATE",cmd_jstate,help_table.none_offset
                 .endif
                 .command_table_entry "JTEST",cmd_jtest,help_table.jtest_offset
+                .command_table_entry "JPRESET",cmd_jpreset,help_table.jpreset_offset
                 .if debug
                 .command_table_entry "KTEST",cmd_ktest,help_table.none_offset
                 .command_table_entry "NTEST",cmd_ntest,help_table.none_offset
@@ -353,6 +357,8 @@ jkeys_offset=*-help_table
                 .text '<f2>'
                 .endif
                 .text ' X|<addr>',0
+jpreset_offset=*-help_table
+                .text ' (<n> <preset> X|<addr>)',0
                 .endblock
 
 ;-------------------------------------------------------------------------
@@ -373,12 +379,9 @@ unexpected_os: .error_table_entry $ff,'Unexpected Electron OS'
                 .if debug
 unknown_key: .error_table_entry $ff,'Unknown key'
                 .endif
+bad_preset_offset: .error_table_entry $ff,'Bad preset number'
                 .endblock
                 
-;-------------------------------------------------------------------------
-
-                .include "build/generated_key_tables.s65"
-
 ;-------------------------------------------------------------------------
 
 joystick_actions: .block
@@ -562,6 +565,10 @@ key_chars_table:
                 nop
                 nop
                 .cerror *-key_chars_table!=112,'oops'
+;-------------------------------------------------------------------------
+                .include "build/generated_key_tables.s65"
+;-------------------------------------------------------------------------
+; there's not much slack here in the standard ROM.
 ;-------------------------------------------------------------------------
                 .align 256
 joystick_fred_offsets_by_jflags:
@@ -1148,21 +1155,24 @@ actions_loop:
                 ldx #State.action_keys
 print_keys_loop:
                 jsr print_following_string
-                .text ' &',0
+                .text ' ',0
 
                 txa
+                pha
                 tay
                 jsr read_state
                 eor #$ff        ;convert to negative INKEY value
-                jsr print_hex_byte
+                jsr print_inkey_name
 
+                pla
+                tax
                 inx
                 cpx #State.action_keys+num_actions
                 bne print_keys_loop
 
                 .if single_fire_button
                 jsr print_following_string
-                .text ' 0',0
+                .text ' &00',0
                 .endif
 
                 jsr print_hook_info
@@ -1335,6 +1345,150 @@ done:
 
 ;-------------------------------------------------------------------------
 
+cmd_jpreset: .proc
+                .section cmd_jpreset_workspace
+joystick_index: .fill 1
+preset_index: .fill 1
+yval: .fill 1
+                .endsection
+                jsr find_string_tail
+                beq print_presets
+
+                sty yval
+                
+                jsr must_be_valid_hw
+                jsr reset_default_vectors
+
+                ldy yval
+                jsr parse_jno
+                sty yval
+                
+                ora #State.jflags.jkeys_mask
+                jsr set_jflags
+
+                ldy yval
+                jsr strtoi
+                sty yval
+                
+                tax             ; X=preset number
+                jsr find_preset_by_index
+                bcs got_preset  ; taken if good preset
+
+                ldx #errors_table.bad_preset_offset
+                jmp do_error
+
+got_preset:
+                ldy #num_actions-1
+get_state_loop:
+                lda (find_preset_by_index.preset_addr),y
+
+                eor #$ff        ; convert to internal key number
+                and #$7f        ; just in case...
+
+                pha
+                dey
+                bpl get_state_loop
+
+                ldy #State.action_keys
+write_state_loop:
+                pla
+                jsr write_state
+                iny
+                cpy #State.action_keys+num_actions
+                bne write_state_loop
+
+                jsr elk_persist_state
+
+                ldy yval
+                jmp handle_install_mode
+
+print_presets:
+                lda #0
+                sta preset_index
+print_presets_loop:
+                ldx preset_index
+                jsr find_preset_by_index
+                bcc done
+
+                lda preset_index
+                jsr print_dec_byte
+
+                jsr print_following_string
+                .text ".",0
+
+                ldy #0
+print_preset_loop:
+                tya
+                pha
+                
+                jsr print_following_string
+                .text " ",0
+
+                pla
+                pha
+                tay
+                lda (find_preset_by_index.preset_addr),y
+                jsr print_inkey_name
+
+                pla
+                tay
+                iny
+                cpy #num_actions
+                bne print_preset_loop
+
+                jsr osnewl
+
+                inc preset_index
+                jmp print_presets_loop
+
+done:
+                rts
+                .endproc
+
+;-------------------------------------------------------------------------
+;
+; entry: X = preset index
+; exit: C=0 - not found
+;       C=1 - found, (preset_addr) is address of preset
+find_preset_by_index: .proc
+                .section find_preset_by_index_workspace
+preset_addr: .fill 2
+                .endsection
+                lda #<presets
+                sta preset_addr+0
+                lda #>presets
+                sta preset_addr+1
+loop:
+                ldy #5
+check_for_terminator_loop:
+                lda (preset_addr),y
+                cmp #inkey(key_none)
+                bne valid
+                dey
+                bpl check_for_terminator_loop
+                ; terminator encountered. Not found.
+                clc
+                rts
+valid:
+                cpx #0
+                bne next
+                sec
+                rts
+
+next:
+                dex
+                clc
+                lda preset_addr+0
+                adc #6
+                sta preset_addr+0
+                bcc loop
+                inc preset_addr+1
+                jmp loop
+                
+                .endproc
+                
+;-------------------------------------------------------------------------
+
 cmd_ktest: .proc
                 jsr print_following_string
                 .text 'Press keys',0
@@ -1422,18 +1576,8 @@ print_name:
                 cmp #State.action_keys
                 bcc next
 
-                ldy #0
                 txa
-                eor #$ff
-find_key_name:
-                cmp key_inkey_numbers_table,y
-                beq string_name_key
-                iny
-                cpy #num_master_keys
-                bne find_key_name
-
-                lda #'?'
-                jsr oswrch
+                jsr print_internal_key_name
 
 next:
                 jsr osnewl
@@ -1463,15 +1607,6 @@ print_vector:
                 jsr print_hex_byte
                 lda $200,x
                 jmp print_hex_byte
-
-string_name_key:
-                ldx key_name_offsets_table,y
--
-                lda key_name_strings_table,x
-                jsr shiftl_oswrch
-                inx
-                bcc -
-                jmp next
 
 print_jflags:
                 jsr print_following_string
@@ -3121,7 +3256,7 @@ parse_jno: .proc
 +
                 rts
                 .endproc
-;
+
 ;-------------------------------------------------------------------------
 ;
 ; Wait for a keypress. Print the pressed key's name.
@@ -3195,6 +3330,42 @@ string_name_loop:
                 rts
                 .endproc
 
+;-------------------------------------------------------------------------
+;
+; Print a key's name by INKEY value or internal key number.
+;
+; Entry: A = INKEY value/internal key number
+;
+print_internal_key_name:
+                eor #$ff
+print_inkey_name: .block
+                ldy #0
+loop:
+                cmp key_inkey_numbers_table,y
+                beq print
+                iny
+                cpy #num_master_keys
+                bne loop
+
+                pha
+                jsr print_following_string
+                .text '? (&',0
+                pla
+                jsr print_hex_byte
+                jsr print_following_string
+                .text ')',0
+                rts
+
+print:
+                ldx key_name_offsets_table,y
+print_loop:
+                lda key_name_strings_table,x
+                jsr shiftl_oswrch
+                inx
+                bcc print_loop
+                rts
+                .endblock
+                
 ;-------------------------------------------------------------------------
 ;
 ; https://beebwiki.mdfs.net/OSBYTE_%2600
@@ -3758,6 +3929,40 @@ nybble:
                 .endproc
 
 ;-------------------------------------------------------------------------
+
+print_dec_byte: .proc
+                ldx #'0'
+hundreds_loop:
+                sec
+                sbc #100
+                bcc got_hundreds
+                inx
+                bne hundreds_loop
+got_hundreds:
+                adc #100
+                pha
+                txa
+                jsr oswrch
+                pla
+                ldx #'0'
+tens_loop:
+                sec
+                sbc #10
+                bcc got_tens
+                inx
+                bne tens_loop
+got_tens:
+                adc #10
+                pha
+                txa
+                jsr oswrch
+                pla
+                clc
+                adc #'0'
+                jmp oswrch
+                .endproc
+                
+;-------------------------------------------------------------------------
 ;
 ; Try to find key by name
 ;
@@ -4278,6 +4483,28 @@ debug_dest=debug_store_a.sta_debug_buffer+1
 
 debug_buffer:
                 .endsection debug
+
                 
                 .endif
-                
+
+;-------------------------------------------------------------------------
+
+                .section presets
+
+preset: .macro uk,dk,lk,rk,f1k,f2k
+                .byte inkey(\uk)
+                .byte inkey(\dk)
+                .byte inkey(\lk)
+                .byte inkey(\rk)
+                .byte inkey(\f1k)
+                .byte inkey(\f2k)
+                .endmacro
+
+                .text "Presets start-->"
+presets:
+                ; u,d,l,r,f1,f2
+                .preset key_colon,key_slash,key_z,key_x,key_return,key_return
+                .preset key_colon,key_slash,key_z,key_x,key_return,key_shift
+                .preset key_colon,key_slash,key_z,key_x,key_space,key_space
+                .preset key_none,key_none,key_none,key_none,key_none,key_none
+                .endsection
