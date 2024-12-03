@@ -568,8 +568,6 @@ key_chars_table:
 ;-------------------------------------------------------------------------
                 .include "build/generated_key_tables.s65"
 ;-------------------------------------------------------------------------
-; there's not much slack here in the standard ROM.
-;-------------------------------------------------------------------------
                 .align 256
 joystick_fred_offsets_by_jflags:
                 .for i=0,i<256,i+=1
@@ -2336,29 +2334,25 @@ escan_multiple_keys:
 
                 ldy elk_jflags
                 ldx joystick_fred_offsets_by_jflags,y
-                lda $fc00,x
-                sta os_seia     ;joystick state
-
-                ldx #num_actions-1
-loop:
-                lda os_seia     ;joystick state
-                and joystick_actions.masks,x
-                beq next        ;taken if not pressed
-
-                lda elk_state_offsets+State.action_keys,x
-                tay
-                lda $200,y
-                cmp os_seiwk+0  ;within scan range?
-                bcc next        ;taken if not
-                beq next        ;taken if not
-                cmp os_seiwk+1  ;existing result covers it?
-                bcs next        ;taken if so
+                ldy $fc00,x     ; Y=joystick state
                 
+
+                .for key_index=0,key_index<num_actions,key_index+=1
+                tya             ; A=joystick state
+                and #1<<key_index
+                beq +           ; taken if not pressed
+
+                lda elk_state_addresses_list[State.action_keys+key_index]
+                cmp os_seiwk+0  ; within scan range?
+                bcc +           ; taken if not
+                beq +           ; taken if not
+                cmp os_seiwk+1  ; existing result covers it?
+                bcs +           ; taken if so
+
                 sta os_seiwk+1
 
-next:
-                dex
-                bpl loop
++
+                .endfor
 
                 ldx os_seiwk+1
                 txa
@@ -2881,17 +2875,18 @@ scan_single_key: .block
                 ldy joystick_fred_offsets_by_jflags,x
                 ldx $fc00,y
 
-                ldy #State.action_keys+num_actions-1
-loop:
-                lda os_x        ;key of interest
+                lda os_x        ; key of interest
+
+                .for key_index=0,key_index<num_actions,key_index+=1
+                ldy #State.action_keys+key_index
                 cmp (os_seiwk),y
-                bne next        ;taken if not this jkey
-                txa             ;get joystick flags
-                and joystick_actions.masks-State.action_keys,y
-                bne pressed     ;taken if this jkey pressed
-next:
-                dey
-                bne loop
+                bne +           ; taken if not this jkey
+                txa             ; get joystick flags
+                and #1<<key_index ; test joystick action
+                bne pressed       ; taken if this jkey pressed
+                lda os_x          ; restore key of interest
++
+                .endfor
 
 default:
                 ; Restore ACCCON.
@@ -2947,28 +2942,28 @@ scan_multiple_keys: .block
                 lda #acccon.ifj|acccon.y
                 tsb acccon
 
-                ; Read joystick flags.
                 lda (os_seiwk)
                 tax
                 ldy joystick_fred_offsets_by_jflags,x
-                ldx $fc00,y
-                ldy #State.action_keys+num_actions-1
-loop:
-                txa             ;A=joystick flags
-                and joystick_actions.masks-State.action_keys,y
-                beq next        ;taken if not pressed
+                ldx $fc00,y     ; X=joystick state
 
-                lda (os_seiwk),y ;get key for this action
-                cmp os_x         ;within scan range?
-                bcc next         ;taken if not
-                beq next         ;taken if not
-                cmp os_y         ;existing result covers it?
-                bcs next         ;taken if so
+                .for key_index=0,key_index<num_actions,key_index+=1
+                txa             ; A=joystick state
+                and #1<<key_index
+                beq +           ; taken if not pressed
+
+                ldy #State.action_keys+key_index
+                lda (os_seiwk),y ; get key for this action
+                cmp os_x         ; within scan range?
+                bcc +            ; taken if not
+                beq +            ; taken if not
+                cmp os_y         ; existing result covers it?
+                bcs +            ; taken if so
+
                 sta os_y
-
-next:
-                dey
-                bne loop
+                
++
+                .endfor
 
                 ; Restore old ACCCON.
                 pla
