@@ -7,6 +7,11 @@ fall_through_to: .macro dest
 
 ;-------------------------------------------------------------------------
 
+; INKEY-128, seemingly unpressable via the keyboard. 
+key_none=$7f
+                
+;-------------------------------------------------------------------------
+
 default_vectors_ptr=$ffb7
 
 os_a=$ef ; A value for osbyte/osword
@@ -573,7 +578,7 @@ state_offset_for_joystick_value:
                 .else
                 .for _j=0,_j<6,_j+=1
                 .if (_i&(1<<_j))!=0
-                .byte _j
+                .byte State.action_keys+_j
                 .break
                 .endif
                 .endfor
@@ -993,7 +998,7 @@ loop:
                 cmp #0
                 bne got_key     ; taken if key recognised - let strtoi
                                 ; try to interpret it as number of not
-                                ; obviously a key namy
+                                ; obviously a key name
 try_strtoi:
                 ldy yval
                 jsr strtoi

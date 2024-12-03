@@ -189,6 +189,14 @@ Keys common to all systems:
 | Q    | -17  | &EF |   | 8    | -22  | &EA |   | CTRL   | -2   | &FE |
 | R    | -52  | &CC |   | 9    | -39  | &D9 |   | CAPS   | -65  | &BF |
 
+There's also an additional special key, corresponding to no key on the
+keyboard. Use this if you don't want a given joystick action to
+correspond to a key. The 
+
+| Name | Dec  | Hex |
+|------|------|-----|
+| NONE | -128 | &80 |
+
 Keys specific to Master:
 
 (The names starting with `N` are for the numeric keypad.)

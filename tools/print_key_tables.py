@@ -104,6 +104,7 @@ intkey_by_name={
     'key_numpad_return':0x3c,
     'key_numpad_delete':0x4b,
     'key_numpad_stop':0x4c,
+    'key_none':0x7f,
 }
 
 # Common keys.
@@ -162,6 +163,7 @@ keys=[
     ElectronKey("SHIFT",'key_shift',0x37),
     ElectronKey("CTRL",'key_ctrl',0x36),
     ElectronKey("CAPS",'key_caps_lock',0x35),
+    ElectronKey('NONE','key_none',None),
 ]
 num_electron_keys=len(keys)
 
