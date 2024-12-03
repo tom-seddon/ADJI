@@ -11,3 +11,4 @@ $.ADJIBUG diff=bbcbasic
 $.DUMPHAZEL diff=bbcbasic
 $.FSINFO diff=bbcbasic
 $.TESTFCC0 diff=bbcbasic
+$.NONETEST diff=bbcbasic

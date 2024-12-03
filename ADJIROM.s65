@@ -2083,6 +2083,10 @@ osbyte_81_electron: .proc
                 cpx #0
                 beq jmp_default_osbyte.with_p_already_pushed
 
+                ; And if polling for the NONE key.
+                cpx #inkey(key_none)
+                beq jmp_default_osbyte.with_p_already_pushed
+
                 ; Is this one of the jkeys?
                 ldy elk_jflags
                 ldx joystick_fred_offsets_by_jflags,y
@@ -2240,14 +2244,17 @@ keyv_electron:
 ;        X, Y, P = KEYV arguments
 handle_keyv_xvector_electron: .proc
                 php
-                bvs +                  ;eliminate V=1 case
+                bvs default_keyv ;eliminate V=1 case
                 bcs escan               ;handle C=1 V=0 case
-+
+default_keyv:
                 jmp jmp_default_keyv.with_p_already_pushed
 
 escan:
                 txa
                 bpl escan_multiple_keys
+
+                cpx #key_none|$80
+                beq default_keyv ; taken if looking for the NONE key
 
                 sei
                 
@@ -2343,6 +2350,8 @@ escan_multiple_keys:
                 beq +           ; taken if not pressed
 
                 lda elk_state_addresses_list[State.action_keys+key_index]
+                cmp #key_none
+                beq +           ; taken if the NONE key
                 cmp os_seiwk+0  ; within scan range?
                 bcc +           ; taken if not
                 beq +           ; taken if not
@@ -2604,6 +2613,11 @@ osbyte_81_master: .proc
                 cpy #$ff
                 beq jmp_default_osbyte.with_p_already_pushed
 +
+
+                ; If polling for the NONE key, pass on to default
+                ; OSBYTE.
+                cpx #inkey(key_none)
+                beq jmp_default_osbyte.with_p_already_pushed
                 
                 ; Is this one of the jkeys?
                 lda acccon
@@ -2840,6 +2854,7 @@ keyv_master: .proc
                 cmp #%00000001  ;check for C=1 V=0
                 beq scan
 
+default_keyv:
                 ; Forward to default KEYV.
                 jmp jmp_default_keyv.with_p_already_pushed
 
@@ -2859,6 +2874,11 @@ scan:
 scan_single_key: .block
                 ; Convert to internal key number.
                 and #$7f
+
+                ; Bail if it turns out to be the NONE key.
+                cmp #key_none
+                beq default_keyv
+                
                 sta os_x
                 
                 ; Set up ACCCON.
@@ -2954,6 +2974,8 @@ scan_multiple_keys: .block
 
                 ldy #State.action_keys+key_index
                 lda (os_seiwk),y ; get key for this action
+                cmp #key_none
+                beq +           ; taken if the NONE key
                 cmp os_x         ; within scan range?
                 bcc +            ; taken if not
                 beq +            ; taken if not
