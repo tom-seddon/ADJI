@@ -79,10 +79,13 @@ joystick can't be used for ordinary text input.
 `Press UP:`, `Press DOWN:`, `Press LEFT:`, `Press RIGHT:`, `Press
 FIRE1:`, `Press FIRE2:` - if you opted for keys mode, you'll be
 prompted for the key that each joystick action should correspond to.
+Press each key in turn.
 
-(If you press Escape here, it'll cancel the setup. If you want to bind
-a joystick action to Escape, you'll need to use the `*JKEYS` command,
-described below.)
+`SHIFT` behaves slightly differently: hold `SHIFT` and press `ESCAPE`
+to cancel; hold `SHIFT` and press `CTRL` to have no key bound to that
+action; or, to use `SHIFT` specifically, tap `SHIFT` (it will be
+recognised when you release it without having pressed another one
+meanwhile).
 
 `Xvector/Overlay (X/O)?` - pick the method the ROM uses to hook into
 the keyboard and joystick processing.

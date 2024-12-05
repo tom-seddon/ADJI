@@ -237,6 +237,8 @@ def main(argv):
     print('num_master_keys=%d'%num_master_keys)
     print('num_electron_keys=%d'%num_electron_keys)
 
+    labeled_inkeys=[0xff,0x80]
+
     # INKEY value. in bits 0-6 (must set bit 7 before use).
     print('key_inkey_numbers_table:')
     for i,k in enumerate(keys):
@@ -244,6 +246,7 @@ def main(argv):
         assert (intkey&0x80)==0
         inkey=~intkey&0xff
         print('    .byte $%02x ; %d %s'%(inkey,i,k.value_str))
+        if inkey in labeled_inkeys: print('%s_index=%d'%(k.value_str,i))
 
     print('key_name_offsets_table:')
     d=0

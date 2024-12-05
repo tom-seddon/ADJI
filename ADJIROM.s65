@@ -1098,6 +1098,11 @@ install:
                 jmp install_overlay
 
 keys:
+                jsr print_following_string
+                .text "Hold SHIFT, then ESCAPE to cancel",10,13
+                .text "Hold SHIFT, then CTRL for NONE",10,13
+                .text 0
+                
                 lda #0
                 sta action_index
 actions_loop:
@@ -3283,11 +3288,37 @@ verbose_get_key: .proc
                 .section verbose_get_key_workspace
 kindex: .fill 1
 num_keys: .fill 1
-                
-; if bit 7 set, waiting for no keys pressed.
-waiting_for_no_keys: .fill 1
+kshift: .fill 1
+kother: .fill 1
+old_escape_action: .fill 1
+; ; if bit 7 set, waiting for no keys pressed.
+; waiting_for_no_keys: .fill 1
                 .endsection
 
+                lda osbyte_var(229) ; AUG p226; EAUG p78
+                pha                 ; save old ESCAPE mode
+                lda #1              ; inhibit ESCAPE
+                sta osbyte_var(229)
+
+                lda #15
+                ldx #1
+                jsr osbyte      ; clear input buffer (AUG p30)
+                
+                jsr verbose_get_key_2
+
+                lda #15
+                ldx #1
+                jsr osbyte      ; clear input buffer (AUG p30)
+
+                pla             ; restore old ESCAPE mode
+                sta osbyte_var(229)
+
+                ldy kindex
+                ldx key_inkey_numbers_table,y
+                
+                rts
+
+verbose_get_key_2:
                 lda #num_electron_keys
                 jsr is_valid_hw
                 bvc +
@@ -3295,57 +3326,111 @@ waiting_for_no_keys: .fill 1
 +
                 sta num_keys
 
-                sec
-main_loop:
-                ror waiting_for_no_keys
-
-                ldy #0
-keys_loop:
-                sty kindex
+                ; Wait for all keys released.
+wait_for_keys_released_loop:
+                lda #0
+                sta kindex
+check_key_released_loop:
+                ldy kindex
                 ldx key_inkey_numbers_table,y
+                ldy #$ff
                 lda #$81
+                jsr osbyte
+                cpx #$ff
+                beq wait_for_keys_released_loop ; taken if pressed
+                inc kindex
+                lda kindex
+                cmp num_keys
+                bne check_key_released_loop
+
+                ; Indicate no non-SHIFT key pressed.
+                lda #0
+                sta kother
+                sta kshift
+
+check_keys_loop:
+                ; Test SHIFT specifically, as it's the modifier.
+                lda #$81
+                ldx #inkey(key_shift)
                 ldy #$ff
                 jsr osbyte
-                
-                cpx #$ff        ;C=1 if pressed
-                beq pressed     ;taken if pressed
-
+                cpx #$ff
+                beq update_shift_status ; taken if pressed
+shift_not_pressed:
+                ; If SHIFT was previously pressed, no other key has
+                ; been pressed meanwhile, so it's the key.
+                lda kshift
+                bne got_shift
+update_shift_status:
+                stx kshift
+check_keys:
+                lda #0
+                sta kindex
+check_key_loop:
                 ldy kindex
-                iny
-                cpy num_keys
-                bne keys_loop
+                ldx key_inkey_numbers_table,y
+                ldy #$ff
+                lda #$81
+                jsr osbyte
+                cpx #$ff
+                beq got_key
+check_next_key:
+                inc kindex
+                lda kindex
+                cmp num_keys
+                bne check_key_loop
+                jmp check_keys_loop
 
-                ; The end of the table is only reached if no keys
-                ; pressed. So arrange for waiting_for_no_keys to get
-                ; reset when repeating.
-                clc
-                bcc main_loop
+got_key:
+                ldy kindex
+                ldx key_inkey_numbers_table,y
+                cpx #inkey(key_shift)
+                beq check_next_key    ; ignore SHIFT - tested above
+                cpx #inkey(key_ctrl)
+                beq got_ctrl_key_or_none_key
+                cpx #inkey(key_escape)
+                beq got_escape_key_or_cancel
 
-pressed:
-                ; If it's escape, sort it out.
-                cmp #inkey(key_escape)
-                bne not_escape_pressed
-
-                lda #$7d        ;Set Escape condition (AUG p148)
-                jmp osbyte
-
-not_escape_pressed:
-                ; If still waiting for no keys, go right back to the
-                ; start. The flag will remain set.
-                bit waiting_for_no_keys
-                bmi verbose_get_key
-
+got_kindex:
                 ldx kindex
                 ldy key_name_offsets_table,x
-string_name_loop:
+print_key_name_loop:
                 lda key_name_strings_table,y
                 jsr shiftl_oswrch
                 iny
-                bcc string_name_loop
-                lda key_inkey_numbers_table,x
-                tax
+                bcc print_key_name_loop
+                ; lda key_inkey_numbers_table,x
+                ; tax
                 rts
-                .endproc
+
+got_ctrl_key_or_none_key:
+                bit kshift
+                bpl got_kindex  ; taken if SHIFT not pressed - it's
+                                ; the CTRL key
+                lda #key_none_index
+                sta kindex
+                jmp got_kindex
+
+got_escape_key_or_cancel:
+                bit kshift
+                bpl got_kindex  ; taken if SHIFT not pressed - it's
+                                ; the ESCAPE key
+                
+                lda #$7d        ;Induce Escape condition (AUG p148)
+                jsr osbyte
+
+                rts
+
+; got_escape:
+;                 lda #$7c        ;Clear Escape condition
+;                 jsr osbyte
+;                 jmp got_kindex
+                
+got_shift:
+                lda #key_shift_index
+                sta kindex
+                jmp got_kindex
+                 .endproc
 
 ;-------------------------------------------------------------------------
 ;
