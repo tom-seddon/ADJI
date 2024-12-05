@@ -1054,7 +1054,7 @@ jno: .fill 1
 jkeys: .fill 1
 use_overlay: .fill 1
 action_index: .fill 1
-                
+old_escape_action: .fill 1
                 .endsection
 
                 jsr reset_default_vectors
@@ -1102,6 +1102,11 @@ keys:
                 .text "Hold SHIFT, then ESCAPE to cancel",10,13
                 .text "Hold SHIFT, then CTRL for NONE",10,13
                 .text 0
+
+                lda osbyte_var(229)
+                sta old_escape_action
+                lda #1
+                sta osbyte_var(229)
                 
                 lda #0
                 sta action_index
@@ -1141,6 +1146,8 @@ actions_loop:
                 ldx #0
                 jsr osbyte
 
+                jsr restore_escape_action
+
                 jsr hook_question
 
                 bit $ff
@@ -1179,9 +1186,13 @@ print_keys_loop:
                 .endif
 
                 jsr print_hook_info
+
                 jmp install
                 
 done:
+restore_escape_action:
+                lda old_escape_action
+                sta osbyte_var(229)
                 rts
 
 hook_question:
