@@ -279,14 +279,15 @@ On the Electron, you can read the value directly. `A%=?&FCC0` from
 BASIC, for example, to read the joystick state into `A%`. Or something
 like `lda &FCC0` from assembly language.
 
-On the Master but page &FC needs to be redirected to the cartridge
-first, by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or
-`lda #&20:tsb &FE34`. Once you've done this, the joystick can be read
-same as on the Electron.
+On the Master, page &FC needs to be redirected to the cartridge first,
+by setting bit 5 of ACCCON (&FE34): `?&FE34=?&FE34 OR &20`, or `lda
+#&20:tsb &FE34`. Once you've done this, the joystick can be read same
+as on the Electron.
 
 Changing this setting may interfere with any devices connected to the
 1 MHz bus, so you might want to save the old value of ACCCON and
-restore it afterwards.
+restore it afterwards. (Unlike on the B+, ACCCON is readable, so a
+simple `lda &FE34` wil suffice.)
 
 # Technical info
 
@@ -308,12 +309,12 @@ One byte is used for flags:
 The remaining 6 are used when the joystick behaves as keys, to store
 the key assignments:
 
-- &02A8 (ROM flags for the keyboard's other ROM bank)
-- &02A9 (ROM flags for the keyboard's ROM bank)
-- &02AA (ROM flags for the BASIC ROM's other ROM bank)
-- &02F5 (unused by Electron OS)
-- &02F6 (unused by Electron OS)
-- &027E (unused by Electron OS)
+- &0261 - unused by Electron OS
+- &02A8 - ROM flags for the keyboard's other ROM bank
+- &02AA - ROM flags for the BASIC ROM's other ROM bank
+- &02F5 - unused by Electron OS
+- &02F6 - unused by Electron OS
+- &027E - unused by Electron OS
 
 To handle persistence across a BREAK, the following areas are also
 used:

@@ -135,6 +135,11 @@ action_keys: .fill num_actions
                 .cerror size(State)>7,'State must be max 7 bytes'
 
 ;-------------------------------------------------------------------------
+
+persistent_state_xvector='X'
+persisent_state_overlay='O'
+                
+;-------------------------------------------------------------------------
 ;
 ; ROM state on Master 128 is stored in a page in HAZEL. Layout just as
 ; per the struct.
@@ -161,15 +166,19 @@ hazel_state_addr=$df00
 ;
 ; Also unused on Electron:
 ;
-; $0261 - "speech suppression status" - unused in practice?
 ; $027F - used by MRB
 ; $0282 - used by MRB??
 ; $028a - used by MRB??
 ; $028b - used by MRB??
-; 
+;
+; $02a9 (ROM flags for bank 9) is unused on the stock Electron, but
+; deliberately left free to accommodate potential future upgrades that
+; use this slot for a ROM:
+; https://www.stardot.org.uk/forums/viewtopic.php?p=461044#p461044
+
 elk_jflags=$0290                ;unused by Electron OS
 elk_up=$02a8                    ;ROM flags for keyboard
-elk_down=$02a9                  ;ROM flags for keyboard
+elk_down=$0261                  ;unused by Electron OS
 elk_left=$02aa                  ;ROM flags for lower-priority BASIC
 elk_right=$02f5                 ;unused by Electron OS
 elk_fire1=$02f6                 ;unused by Electron OS
@@ -789,26 +798,45 @@ boot_done:
 
 maybe_boot:
                 jsr is_valid_hw
-                bcc boot_done
+                bcc boot_done    ; taken if invalid hardware
+
+                ; Taken if Master. There's no checksum for the Master
+                ; data as the chance of corruption is much lower.
                 bvs maybe_boot_2
 
-                ; Try to copy state from persistent area.
+                ; Check persistent area checksum.
                 ldy #size(State)-1
                 lda #0
-                pha
-reinstate_loop:
-                pla
+check_persistent_area_checksum_loop:
                 clc
                 adc elk_persistent_state+1,y
-                pha
+                dey
+                bpl check_persistent_area_checksum_loop
+
+                cmp elk_persistent_state+0
+                bne @b boot_done ; taken if persistent state is bogus
+
+                ; Check the xvector/overlay setting. This same check
+                ; is done again later, but no harm in doing it here as
+                ; well just in case the (not very clever) checksum
+                ; accidentally passes.
+                ldx #0
+                jsr load_persistent_state_metadata
+                cmp #persistent_state_xvector
+                beq copy_persistent_area ; taken if valid
+                cmp #persisent_state_overlay
+                bne @b boot_done ; taken if not valid
+
+copy_persistent_area:
+                ; Copy state from persistent area.
+                ldy #size(State)-1
+copy_persistent_area_loop:
                 lda elk_persistent_state+1,y
                 jsr write_state
                 dey
-                bpl reinstate_loop
+                bpl copy_persistent_area_loop
 
-                pla
-                cmp elk_persistent_state+0
-                bne @b boot_done ;taken if persistent state is bogus
+                ; Fall through to default setup. 
 
 maybe_boot_2:
                 ldy #State.jflags
@@ -826,11 +854,11 @@ loop:
 
                 ldx #0
                 jsr load_persistent_state_metadata
-                cmp #'X'
+                cmp #persistent_state_xvector
                 beq xvector
 
 overlay:
-                cmp #'O'
+                cmp #persisent_state_overlay
                 bne @b boot_done
 
                 ldx #2
@@ -851,12 +879,12 @@ overlay:
 xvector:
                 ldx #1
                 jsr load_persistent_state_metadata
-                cmp #'X'
+                cmp #persistent_state_xvector
                 bne @b boot_done
                 ldx #2
                 jsr load_persistent_state_metadata
-                cmp #'X'
-                bne @b boot_done
+                cmp #persistent_state_xvector
+                bne boot_done
                 jsr install_xvector
                 jmp boot_done
                 .endproc
@@ -1724,7 +1752,7 @@ master_loop:
                 jsr maybe_set_overlay_keyv
 
 note_overlay_address:
-                lda #'O'
+                lda #persisent_state_overlay
                 ldx #0
                 jsr store_persistent_state_metadata
                 lda strtoi_value+0
@@ -1815,7 +1843,7 @@ xvectors: .fill 2
                 sta (xvectors),y
 keyv_done:
 
-                lda #'X'
+                lda #persistent_state_xvector
                 ldx #0
                 jsr store_persistent_state_metadata
                 ldx #1
