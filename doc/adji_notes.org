@@ -740,4 +740,18 @@ Publish.
 Bump the version number in =ADJIROM.s65= ready for the next release,
 and commit that.
 
+* MMFS
+
+https://www.stardot.org.uk/forums/viewtopic.php?p=457657#p457657
+
+Can build with Git Bash. Looks like
+bf476ba1c2001cdfa7d555ab964a7e8045a7948c corresponds to 1.54.
+
+Electron MMFS SWRAM EPP 1.54 = e/eswmmfs.rom
+
+MMFS Bootstrap = e/zemmfs.rom
+
+Looks like MMFS Bootstrap contains a verbatim copy of the MMFS ROM at
++$400.
+
 * eof
