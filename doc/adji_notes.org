@@ -714,8 +714,10 @@ Master combinations:
 
 * Release process
 
-Do this from =main=. =git push= so that the working copy matches the
-head version on GitHub.
+Do this from =main=.
+
+=git push= so that the working copy matches the head version on
+GitHub.
 
 Run =make= to build release. (Specify =DIRTY_OK\=1= if testing with a
 dirty working copy. Don't use these builds for a release though!)
