@@ -41,7 +41,7 @@ def main2(options):
         output_name=os.path.join(options.output_path,output_name)
         
     pv('padded size: %d\n'%len(data))
-    while len(data)<65536:
+    while len(data)<=65536:
         assert len(data)%1024==0
         output_path='%s.%dK%s'%(output_name,len(data)//1024,output_ext)
         pv('%s...\n'%output_path)

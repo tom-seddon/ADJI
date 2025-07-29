@@ -49,7 +49,7 @@ build:
 	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=false $(call TASS_OUTPUTS,ADJIROM_1fire) ADJIROM.s65
 	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=true $(call TASS_OUTPUTS,ADJIROM_1fire_debug) ADJIROM.s65
 
-	$(_V)$(SHELLCMD) rm-file "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
+	$(_V)$(SHELLCMD) rm-file --force "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
 
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) stat --size-budget 8192 "$(BUILD)/ADJIROM.bin"
