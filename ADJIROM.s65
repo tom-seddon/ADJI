@@ -4189,7 +4189,20 @@ find_command: .proc
 fc_table_offset: .fill 1
 fc_string_offset: .fill 1
                 .endsection
-                
+
+                ; The BASIC Editor & Toolkit calls OSCLI with a
+                ; command line contained within the ROM. Try to avoid
+                ; this case!
+                lda $f3
+                bpl ok          ; taken if address<$8000, ok
+                cmp #$c0
+                bcs ok          ; taken if address>=$c000
+
+                ; Return as if command not found.
+                sec
+                rts
+
+ok:
                 stx fc_table_offset
                 sty fc_string_offset
                 ; clc
