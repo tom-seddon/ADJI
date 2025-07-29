@@ -93,7 +93,7 @@ rel:
 	$(_V)$(MAKE) build
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(PYTHON) $(BEEB_BIN)/ssd_create.py -o "$(SSD_PATH)" "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
-	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.bin ADJIROM.*.bin ADJIROM_debug.16K.bin ADJIROM_1fire.*.bin ADJIROM_1fire_debug.16K.bin "$(SSD_PATH)"
+	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.*.bin ADJIROM_debug.16K.bin ADJIROM_1fire.*.bin ADJIROM_1fire_debug.16K.bin "$(SSD_PATH)"
 	$(_V)echo Release name: ADJI-$(GIT_VER)
 	$(_V)echo ZIP file: $(ZIP_PATH)
 
