@@ -42,12 +42,12 @@ def main2(options):
         
     pv('padded size: %d\n'%len(data))
     while len(data)<65536:
-        data+=data
         assert len(data)%1024==0
         output_path='%s.%dK%s'%(output_name,len(data)//1024,output_ext)
         pv('%s...\n'%output_path)
         if save:
             with open(output_path,'wb') as f: f.write(data)
+        data+=data
 
 ##########################################################################
 ##########################################################################

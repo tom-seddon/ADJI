@@ -49,10 +49,7 @@ build:
 	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=false $(call TASS_OUTPUTS,ADJIROM_1fire) ADJIROM.s65
 	$(_V)$(TASS) $(TASS_ARGS) -Dsingle_fire_button=true -Ddebug=true $(call TASS_OUTPUTS,ADJIROM_1fire_debug) ADJIROM.s65
 
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.bin" "$(BEEB_BUILD)/$$.ADJI"
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.bin" "$(BEEB_BUILD)/D.ADJI"
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire.bin" "$(BEEB_BUILD)/$$.ADJI1F"
-	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire_debug.bin" "$(BEEB_BUILD)/D.ADJI1F"
+	$(_V)$(SHELLCMD) rm-file "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
 
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) stat --size-budget 8192 "$(BUILD)/ADJIROM.bin"
@@ -61,6 +58,15 @@ build:
 	$(_V)$(SHELLCMD) stat "$(BUILD)/ADJIROM_1fire_debug.bin"
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(SHELLCMD) sha1 "$(BUILD)/ADJIROM.bin"
+	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM.bin" -o "$(BUILD)"
+	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM_1fire.bin" -o "$(BUILD)"
+	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM_debug.bin" -o "$(BUILD)"
+	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM_1fire_debug.bin" -o "$(BUILD)"
+
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM.16K.bin" "$(BEEB_BUILD)/$$.ADJI"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_debug.16K.bin" "$(BEEB_BUILD)/D.ADJI"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire.16K.bin" "$(BEEB_BUILD)/$$.ADJI1F"
+	$(_V)$(SHELLCMD) copy-file "$(BUILD)/ADJIROM_1fire_debug.16K.bin" "$(BEEB_BUILD)/D.ADJI1F"
 
 ##########################################################################
 ##########################################################################
@@ -87,8 +93,7 @@ rel:
 	$(_V)$(MAKE) build
 	$(_V)$(SHELLCMD) blank-line
 	$(_V)$(PYTHON) $(BEEB_BIN)/ssd_create.py -o "$(SSD_PATH)" "$(BEEB_BUILD)/$$.ADJI" "$(BEEB_BUILD)/D.ADJI" "$(BEEB_BUILD)/$$.ADJI1F" "$(BEEB_BUILD)/D.ADJI1F"
-	$(_V)$(PYTHON) "$(BIN)/make_all_rom_sizes.py" "$(BUILD)/ADJIROM.bin" -o "$(BUILD)"
-	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.bin ADJIROM.*.bin ADJIROM_debug.bin ADJIROM_1fire.bin ADJIROM_1fire_debug.bin "$(SSD_PATH)"
+	$(_V)cd "$(BUILD)" && zip -9j $(ZIP_Q) "$(ZIP_PATH)" ADJIROM.bin ADJIROM.*.bin ADJIROM_debug.16K.bin ADJIROM_1fire.*.bin ADJIROM_1fire_debug.16K.bin "$(SSD_PATH)"
 	$(_V)echo Release name: ADJI-$(GIT_VER)
 	$(_V)echo ZIP file: $(ZIP_PATH)
 
