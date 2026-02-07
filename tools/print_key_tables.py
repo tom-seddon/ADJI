@@ -109,6 +109,10 @@ intkey_by_name={
 
 # Common keys.
 keys=[
+    # A single '.' matches the first entry in the table. Rather than
+    # check for this specifically, just put have '.' as the first
+    # entry.
+    ElectronKey('.','key_stop',0x13),
     ElectronKey('A','key_a',0x32),
     ElectronKey('B','key_b',0x23),
     ElectronKey('C','key_c',0x2b),
@@ -149,7 +153,6 @@ keys=[
     ElectronKey(';','key_semicolon',0x0e),
     ElectronKey(':','key_colon',0x0a),
     ElectronKey(',','key_comma',0x17),
-    ElectronKey('.','key_stop',0x13),
     ElectronKey('/','key_slash',0x0f),
     ElectronKey("SPACE",'key_space',0x03),
     ElectronKey("ESCAPE",'key_escape',0x34),
