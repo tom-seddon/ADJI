@@ -832,6 +832,9 @@ copy_persistent_area:
                 ldy #size(State)-1
 copy_persistent_area_loop:
                 lda elk_persistent_state+1,y
+                ; Clear bit 7. Don't let the OS try to call a service
+                ; routine in this bank.
+                and #$7f
                 jsr write_state
                 dey
                 bpl copy_persistent_area_loop
